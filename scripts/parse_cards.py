@@ -51,6 +51,22 @@ CHOICE_LINE_RE = re.compile(
 HEADING_NUMBER_RE = re.compile(r"^#{0,6}\s*第([0-9０-９]+)問")
 ANSWER_PAREN_NUMBER_RE = re.compile(r"^[（(]\s*([0-9０-９])\s*[）)]\s*$")
 
+KATAKANA_COMBO_RE = re.compile(r"^[アイウエオカキクケコ]{2,}$")
+OX_LINE_RE = re.compile(
+    r"^[ア-ン]\s*[-－：―]\s*[〇✕]"
+    r"(?:\s*[、/／,，]?\s*[ア-ン]\s*[-－：―]\s*[〇✕])*$"
+)
+OX_TOKEN_RE = re.compile(r"([ア-ン])\s*[-－：―]\s*([〇✕])")
+
+
+def normalize_choice_text(text: str) -> str:
+    if KATAKANA_COMBO_RE.match(text):
+        return "・".join(text)
+    if OX_LINE_RE.match(text):
+        tokens = OX_TOKEN_RE.findall(text)
+        return "、".join(f"{letter}－{symbol}" for letter, symbol in tokens)
+    return text
+
 
 def to_int(s: str) -> int:
     return int("".join(FULLWIDTH_DIGITS.get(ch, ch) for ch in s))
@@ -146,7 +162,7 @@ def split_prompt_and_choices(question_text: str):
         for pos, _ in run:
             line_idx, line = nonblank[pos]
             m = CHOICE_LINE_RE.match(line.strip())
-            text = m.group(3).strip().replace("**", "")
+            text = normalize_choice_text(m.group(3).strip().replace("**", ""))
             marker_val = _marker_value(m.group(1), m.group(2))
             marker_char = CHOICE_MARKER_CHARS[marker_val - 1]
             choices.append(f"{marker_char} {text}")

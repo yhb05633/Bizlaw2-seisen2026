@@ -104,6 +104,9 @@
   #question-text ul, #answer-text ul { margin: 0 0 10px; padding-left: 1.4em; }
   #answer-text li { margin-bottom: 1em; }
   #answer-text li:last-child { margin-bottom: 0; }
+  #answer-result { font-weight: bold; font-size: 1.1rem; margin: 0 0 10px; }
+  #answer-result.correct { color: #16a34a; }
+  #answer-result.incorrect { color: #dc2626; }
   .choice {
     padding: 12px 14px;
     border: 1px solid #d6d3d1;
@@ -187,6 +190,7 @@
       <div class="tap-hint">タップして解答を見る</div>
     </div>
     <div class="card-face card-back">
+      <div id="answer-result"></div>
       <div id="answer-text"></div>
     </div>
     <div class="star-row-container">
@@ -208,6 +212,7 @@
     <h2>成績</h2>
     <p id="score-summary"></p>
     <ul id="score-list"></ul>
+    <button id="btn-score-reset">成績をリセット</button>
     <button id="btn-score-close">閉じる</button>
   </div>
 </div>
@@ -446,6 +451,20 @@ function selectChoice(idx) {
   if (isNewSelection && selectedChoiceIndex !== null) {
     incrementStarCount(card.id);
   }
+  updateResultBadge();
+}
+
+function updateResultBadge() {
+  const card = currentCards[currentIndex];
+  const el = document.getElementById('answer-result');
+  if (selectedChoiceIndex === null || card.answerIndex === null || card.answerIndex === undefined) {
+    el.textContent = '';
+    el.className = '';
+    return;
+  }
+  const isCorrect = selectedChoiceIndex === card.answerIndex;
+  el.textContent = isCorrect ? '正解' : '不正解';
+  el.className = isCorrect ? 'correct' : 'incorrect';
 }
 
 function updateChoiceSelectionUI() {
@@ -484,6 +503,7 @@ function renderCard() {
   document.getElementById('card').classList.toggle('flipped', isFlipped);
   updateProgressButtons(card.id);
   renderStarRow(card.id);
+  updateResultBadge();
 }
 
 document.getElementById('card').addEventListener('click', () => {
@@ -491,6 +511,7 @@ document.getElementById('card').addEventListener('click', () => {
   isFlipped = !isFlipped;
   if (isFlipped) {
     recordAnswerIfNeeded(card);
+    updateResultBadge();
   }
   document.getElementById('card').classList.toggle('flipped', isFlipped);
 });
@@ -545,8 +566,9 @@ function showScoreOverlay() {
   const entries = Object.entries(sessionResults);
   const correct = entries.filter(([, v]) => v === 'correct').length;
   const total = entries.length;
+  const rate = total === 0 ? null : Math.round((correct / total) * 100);
   document.getElementById('score-summary').textContent =
-    total === 0 ? 'まだ回答していません' : `${total}問中${correct}問正解`;
+    total === 0 ? 'まだ回答していません' : `${total}問中${correct}問正解（正解率${rate}%）`;
   const list = currentCards
     .filter((c) => sessionResults[c.id])
     .map((c) => `<li>第${c.chapter}章 第${c.questionNumber}問（${escapeHtml(c.title)}）: ${sessionResults[c.id] === 'correct' ? '正解' : '不正解'}</li>`)
@@ -561,6 +583,10 @@ document.getElementById('btn-score').addEventListener('click', (e) => {
 });
 document.getElementById('btn-score-close').addEventListener('click', () => {
   document.getElementById('score-overlay').hidden = true;
+});
+document.getElementById('btn-score-reset').addEventListener('click', () => {
+  sessionResults = {};
+  showScoreOverlay();
 });
 
 renderChapterList();

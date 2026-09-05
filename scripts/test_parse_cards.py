@@ -9,6 +9,7 @@ from parse_cards import (
     extract_titles,
     split_prompt_and_choices,
     compute_answer_index,
+    normalize_choice_text,
 )
 
 
@@ -241,8 +242,8 @@ class TestSplitPromptAndChoices(unittest.TestCase):
         prompt, choices, is_prose = split_prompt_and_choices(question)
         self.assertFalse(is_prose)
         self.assertEqual(len(choices), 5)
-        self.assertEqual(choices[0], "① アイ")
-        self.assertEqual(choices[1], "② アウ")
+        self.assertEqual(choices[0], "① ア・イ")
+        self.assertEqual(choices[1], "② ア・ウ")
         self.assertNotIn("*", choices[1])
 
     def test_supports_six_choices(self):
@@ -329,6 +330,44 @@ class TestComputeAnswerIndex(unittest.TestCase):
         # position into those choices.
         self.assertEqual(compute_answer_index("（2）"), 1)
         self.assertEqual(compute_answer_index("（5）"), 4)
+
+
+class TestNormalizeChoiceText(unittest.TestCase):
+    def test_inserts_nakaguro_between_bare_katakana_letters(self):
+        self.assertEqual(normalize_choice_text("アイウ"), "ア・イ・ウ")
+        self.assertEqual(normalize_choice_text("アイ"), "ア・イ")
+        self.assertEqual(normalize_choice_text("ウエオ"), "ウ・エ・オ")
+
+    def test_leaves_already_separated_katakana_unchanged(self):
+        self.assertEqual(normalize_choice_text("ア・イ・ウ"), "ア・イ・ウ")
+
+    def test_leaves_prose_choice_text_unchanged(self):
+        text = "商法上、商人である対話者の間においては、契約は効力を失う。"
+        self.assertEqual(normalize_choice_text(text), text)
+
+    def test_normalizes_ox_combination_with_comma_and_fullwidth_dash(self):
+        self.assertEqual(
+            normalize_choice_text("ア－✕、イ－〇、ウ－〇、エ－〇"),
+            "ア－✕、イ－〇、ウ－〇、エ－〇",
+        )
+
+    def test_normalizes_ox_combination_with_halfwidth_hyphen(self):
+        self.assertEqual(
+            normalize_choice_text("ア-〇、イ-✕、ウ-✕、エ-✕"),
+            "ア－〇、イ－✕、ウ－✕、エ－✕",
+        )
+
+    def test_normalizes_ox_combination_with_colon_and_slash(self):
+        self.assertEqual(
+            normalize_choice_text("ア：〇 / イ：✕ / ウ：〇 / エ：〇 / オ：✕"),
+            "ア－〇、イ－✕、ウ－〇、エ－〇、オ－✕",
+        )
+
+    def test_normalizes_ox_combination_with_em_dash_and_irregular_spacing(self):
+        self.assertEqual(
+            normalize_choice_text("ア―✕ イ―✕  ウ―〇  エ―✕  オ―✕"),
+            "ア－✕、イ－✕、ウ－〇、エ－✕、オ－✕",
+        )
 
 
 if __name__ == "__main__":
