@@ -113,9 +113,6 @@ def _marker_value(circled, digit):
 
 
 def split_prompt_and_choices(question_text: str):
-    if "<u>" in question_text:
-        return question_text, [], True
-
     lines = question_text.split("\n")
     nonblank = [(i, l) for i, l in enumerate(lines) if l.strip() != ""]
 
@@ -125,41 +122,37 @@ def split_prompt_and_choices(question_text: str):
         if m:
             marker_positions.append((pos, _marker_value(m.group(1), m.group(2))))
 
-    if not marker_positions:
-        return question_text, [], True
+    run = []
+    if marker_positions:
+        last_nonblank_pos = len(nonblank) - 1
+        if marker_positions[-1][0] == last_nonblank_pos:
+            run = [marker_positions[-1]]
+            for entry in reversed(marker_positions[:-1]):
+                prev_pos, prev_val = run[-1]
+                pos, val = entry
+                if pos == prev_pos - 1 and val == prev_val - 1:
+                    run.append(entry)
+                else:
+                    break
+            run.reverse()
+            if len(run) < 3 or run[0][1] != 1:
+                run = []
 
-    last_nonblank_pos = len(nonblank) - 1
-    if marker_positions[-1][0] != last_nonblank_pos:
-        return question_text, [], True
+    if run:
+        start_nonblank_pos = run[0][0]
+        start_line_idx = nonblank[start_nonblank_pos][0]
+        prompt = "\n".join(lines[:start_line_idx]).strip()
+        choices = []
+        for pos, _ in run:
+            line_idx, line = nonblank[pos]
+            m = CHOICE_LINE_RE.match(line.strip())
+            text = m.group(3).strip().replace("**", "")
+            marker_val = _marker_value(m.group(1), m.group(2))
+            marker_char = CHOICE_MARKER_CHARS[marker_val - 1]
+            choices.append(f"{marker_char} {text}")
+        return prompt, choices, False
 
-    run = [marker_positions[-1]]
-    for entry in reversed(marker_positions[:-1]):
-        prev_pos, prev_val = run[-1]
-        pos, val = entry
-        if pos == prev_pos - 1 and val == prev_val - 1:
-            run.append(entry)
-        else:
-            break
-    run.reverse()
-
-    if len(run) < 3 or run[0][1] != 1:
-        return question_text, [], True
-
-    start_nonblank_pos = run[0][0]
-    start_line_idx = nonblank[start_nonblank_pos][0]
-
-    prompt = "\n".join(lines[:start_line_idx]).strip()
-
-    choices = []
-    for pos, _ in run:
-        line_idx, line = nonblank[pos]
-        m = CHOICE_LINE_RE.match(line.strip())
-        text = m.group(3).strip().replace("**", "")
-        marker_val = _marker_value(m.group(1), m.group(2))
-        marker_char = CHOICE_MARKER_CHARS[marker_val - 1]
-        choices.append(f"{marker_char} {text}")
-
-    return prompt, choices, False
+    return question_text, [], True
 
 
 def compute_answer_index(answer: str):

@@ -132,6 +132,7 @@
     border: 1px solid #d6d3d1;
     background: white;
   }
+  .overlay[hidden] { display: none; }
   .overlay {
     position: fixed;
     inset: 0;
@@ -474,7 +475,9 @@ function renderCard() {
   renderHeader(card);
   document.getElementById('question-text').innerHTML = formatText(card.prompt, false);
   renderChoices(card);
-  document.getElementById('exam-ref').textContent = card.examRef;
+  const examRefEl = document.getElementById('exam-ref');
+  examRefEl.textContent = card.examRef;
+  examRefEl.hidden = !card.examRef;
   document.getElementById('answer-text').innerHTML =
     `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` +
     formatExplanation(stripLeadingAnswerLine(card.explanation, card.answer));
@@ -546,7 +549,7 @@ function showScoreOverlay() {
     total === 0 ? 'まだ回答していません' : `${total}問中${correct}問正解`;
   const list = currentCards
     .filter((c) => sessionResults[c.id])
-    .map((c) => `<li>第${c.questionNumber}問（${c.title}）: ${sessionResults[c.id] === 'correct' ? '正解' : '不正解'}</li>`)
+    .map((c) => `<li>第${c.chapter}章 第${c.questionNumber}問（${escapeHtml(c.title)}）: ${sessionResults[c.id] === 'correct' ? '正解' : '不正解'}</li>`)
     .join('');
   document.getElementById('score-list').innerHTML = list;
   document.getElementById('score-overlay').hidden = false;

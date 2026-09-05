@@ -293,6 +293,21 @@ class TestSplitPromptAndChoices(unittest.TestCase):
         self.assertTrue(is_prose)
         self.assertEqual(choices, [])
 
+    def test_extracts_combination_choices_even_with_inline_underline_paragraph(self):
+        question = (
+            "次の文章中の下線部（a）〜（e）のうち適切なものの組み合わせを選びなさい。\n\n"
+            "本文です。（a）<u>下線部分A</u>という記述と、（b）<u>下線部分B</u>という記述があります。\n\n"
+            "①（a）（b）（c）\n"
+            "②（a）（b）（e）\n"
+            "③（a）（d）（e）\n"
+            "④（b）（c）（d）\n"
+            "⑤（c）（d）（e）"
+        )
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(len(choices), 5)
+        self.assertIn("<u>下線部分A</u>", prompt)
+
 
 class TestComputeAnswerIndex(unittest.TestCase):
     def test_circled_marker(self):
