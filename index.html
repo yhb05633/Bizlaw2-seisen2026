@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ビジ法2級 精選フラッシュカード</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1d4ed8">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: #f5f5f4;
+    color: #1c1917;
+  }
+  h1 { font-size: 1.1rem; padding: 16px; margin: 0; }
+  #chapter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 0 16px 16px;
+  }
+  .chapter-item {
+    text-align: left;
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px solid #d6d3d1;
+    background: white;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .chapter-item:active { background: #e7e5e4; }
+</style>
+</head>
+<body>
+<div id="chapter-screen">
+  <h1>ビジ法2級 精選フラッシュカード</h1>
+  <div id="chapter-list"></div>
+</div>
+<div id="card-screen" hidden></div>
+
+<script src="cards.js"></script>
+<script>
+function renderChapterList() {
+  const container = document.getElementById('chapter-list');
+  container.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.className = 'chapter-item';
+  allBtn.textContent = `すべて［${CARDS.length}問］`;
+  allBtn.addEventListener('click', () => startChapter('all'));
+  container.appendChild(allBtn);
+
+  for (const ch of CHAPTERS) {
+    const btn = document.createElement('button');
+    btn.className = 'chapter-item';
+    btn.textContent = `第${ch.number}章 ${ch.title}［${ch.count}問］`;
+    btn.addEventListener('click', () => startChapter(ch.number));
+    container.appendChild(btn);
+  }
+}
+
+function startChapter(target) {
+  console.log('startChapter called with', target);
+}
+
+renderChapterList();
+</script>
+</body>
+</html>
