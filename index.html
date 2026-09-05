@@ -33,6 +33,34 @@
     cursor: pointer;
   }
   .chapter-item:active { background: #e7e5e4; }
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+  }
+  .toolbar button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+  }
+  #card {
+    margin: 0 16px 16px;
+    border: 1px solid #d6d3d1;
+    border-radius: 12px;
+    background: white;
+    padding: 20px;
+    min-height: 300px;
+    cursor: pointer;
+  }
+  .card-back { display: none; }
+  #card.flipped .card-front { display: none; }
+  #card.flipped .card-back { display: block; }
+  .exam-ref { font-size: 0.8rem; color: #78716c; margin-bottom: 8px; }
+  .tap-hint { font-size: 0.8rem; color: #a8a29e; margin-top: 16px; }
+  #question-text p, #answer-text p { line-height: 1.6; margin: 0 0 10px; }
+  #question-text ul, #answer-text ul { margin: 0 0 10px; padding-left: 1.4em; }
 </style>
 </head>
 <body>
@@ -40,7 +68,22 @@
   <h1>ビジ法2級 精選フラッシュカード</h1>
   <div id="chapter-list"></div>
 </div>
-<div id="card-screen" hidden></div>
+<div id="card-screen" hidden>
+  <div class="toolbar">
+    <button id="btn-back">← 章一覧</button>
+    <span id="progress-label"></span>
+  </div>
+  <div id="card">
+    <div class="card-face card-front">
+      <div id="exam-ref" class="exam-ref"></div>
+      <div id="question-text"></div>
+      <div class="tap-hint">タップして解答を見る</div>
+    </div>
+    <div class="card-face card-back">
+      <div id="answer-text"></div>
+    </div>
+  </div>
+</div>
 
 <script src="cards.js"></script>
 <script>
@@ -63,9 +106,67 @@ function renderChapterList() {
   }
 }
 
-function startChapter(target) {
-  console.log('startChapter called with', target);
+let currentCards = [];
+let currentIndex = 0;
+let isFlipped = false;
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+function formatText(text) {
+  const lines = text.split('\n');
+  let html = '';
+  let inList = false;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === '') {
+      if (inList) { html += '</ul>'; inList = false; }
+      continue;
+    }
+    const isBullet = /^[*\-]\s+/.test(line);
+    const content = isBullet ? line.replace(/^[*\-]\s+/, '') : line;
+    const withBold = escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    if (isBullet) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${withBold}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<p>${withBold}</p>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
+function startChapter(target) {
+  currentCards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
+  currentIndex = 0;
+  isFlipped = false;
+  document.getElementById('chapter-screen').hidden = true;
+  document.getElementById('card-screen').hidden = false;
+  renderCard();
+}
+
+function renderCard() {
+  const card = currentCards[currentIndex];
+  document.getElementById('progress-label').textContent = `${currentIndex + 1} / ${currentCards.length}`;
+  document.getElementById('exam-ref').textContent = card.examRef;
+  document.getElementById('question-text').innerHTML = formatText(card.question);
+  document.getElementById('answer-text').innerHTML =
+    `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` + formatText(card.explanation);
+  document.getElementById('card').classList.toggle('flipped', isFlipped);
+}
+
+document.getElementById('card').addEventListener('click', () => {
+  isFlipped = !isFlipped;
+  document.getElementById('card').classList.toggle('flipped', isFlipped);
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  document.getElementById('card-screen').hidden = true;
+  document.getElementById('chapter-screen').hidden = false;
+});
 
 renderChapterList();
 </script>
