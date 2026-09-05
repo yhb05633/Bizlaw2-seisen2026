@@ -203,6 +203,28 @@ class TestExtractTitles(unittest.TestCase):
         titles = extract_titles(text)
         self.assertEqual(titles, ["独占禁止法", "独占禁止法"])
 
+    def test_ignores_explanation_bullets_when_falling_back_to_previous_title(self):
+        # Real-data variant (chapters 13-16): a subsection title is shared
+        # by several consecutive questions, and the first question's
+        # explanation contains markdown-bullet per-choice commentary
+        # (e.g. "* **ア：適切でない。**"). That bullet line must not be
+        # mistaken for the second question's title.
+        text = (
+            "### 取締役・取締役会\n"
+            "#### 第1問（第1回 第1問 1-1）\n"
+            "本文A\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①**\n\n"
+            "* **ア：適切でない。**\n"
+            "  説明文がここに入ります。\n\n"
+            "#### 第2問（第1回 第2問 2-1）\n"
+            "本文B\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：②**\n"
+        )
+        titles = extract_titles(text)
+        self.assertEqual(titles, ["取締役・取締役会", "取締役・取締役会"])
+
 
 class TestSplitPromptAndChoices(unittest.TestCase):
     def test_splits_clean_five_choice_question(self):
