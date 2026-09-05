@@ -37,6 +37,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     padding: 12px 16px;
   }
   .toolbar button {
@@ -45,6 +46,7 @@
     border: 1px solid #d6d3d1;
     background: white;
   }
+  #progress-label { flex: 1; text-align: center; font-size: 0.9rem; }
   #slider { width: calc(100% - 32px); margin: 0 16px 8px; }
   .nav-buttons {
     display: flex;
@@ -81,17 +83,83 @@
     border: 1px solid #d6d3d1;
     border-radius: 12px;
     background: white;
-    padding: 20px;
-    min-height: 300px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 20px 0;
+  }
+  .chapter-line { font-size: 0.75rem; color: #78716c; }
+  .question-line { font-size: 0.95rem; font-weight: bold; margin-top: 2px; }
+  .card-face {
+    padding: 12px 20px 20px;
+    min-height: 220px;
     cursor: pointer;
   }
   .card-back { display: none; }
   #card.flipped .card-front { display: none; }
   #card.flipped .card-back { display: block; }
-  .exam-ref { font-size: 0.8rem; color: #78716c; margin-bottom: 8px; }
+  .exam-ref { font-size: 0.8rem; color: #78716c; margin-top: 16px; }
   .tap-hint { font-size: 0.8rem; color: #a8a29e; margin-top: 16px; }
   #question-text p, #answer-text p { line-height: 1.6; margin: 0 0 10px; }
   #question-text ul, #answer-text ul { margin: 0 0 10px; padding-left: 1.4em; }
+  #answer-text li { margin-bottom: 1em; }
+  #answer-text li:last-child { margin-bottom: 0; }
+  .choice {
+    padding: 12px 14px;
+    border: 1px solid #d6d3d1;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    font-weight: normal;
+    line-height: 1.5;
+    cursor: pointer;
+  }
+  .choice.selected { background: #1c1917; color: white; border-color: #1c1917; }
+  #question-text u.choice-span { cursor: pointer; text-decoration-thickness: 2px; }
+  #question-text u.choice-span.selected { background: #1c1917; color: white; }
+  .star-row-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    border-top: 1px solid #e7e5e4;
+  }
+  .star-row { font-size: 1.05rem; letter-spacing: 2px; color: #d97706; }
+  #btn-star-reset {
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #d6d3d1;
+    background: white;
+  }
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .overlay-content {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 400px;
+    width: 100%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .overlay-content h2 { margin-top: 0; font-size: 1.1rem; }
+  .overlay-content ul { padding-left: 1.2em; }
+  .overlay-content button {
+    margin-top: 12px;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+  }
 </style>
 </head>
 <body>
@@ -103,16 +171,26 @@
   <div class="toolbar">
     <button id="btn-back">← 章一覧</button>
     <span id="progress-label"></span>
+    <button id="btn-score">成績を見る</button>
   </div>
   <input type="range" id="slider" min="1" max="1" value="1">
   <div id="card">
+    <div class="card-header">
+      <div class="chapter-line" id="header-chapter"></div>
+      <div class="question-line" id="header-question"></div>
+    </div>
     <div class="card-face card-front">
-      <div id="exam-ref" class="exam-ref"></div>
       <div id="question-text"></div>
+      <div id="choices-container"></div>
+      <div class="exam-ref" id="exam-ref"></div>
       <div class="tap-hint">タップして解答を見る</div>
     </div>
     <div class="card-face card-back">
       <div id="answer-text"></div>
+    </div>
+    <div class="star-row-container">
+      <div class="star-row" id="star-row"></div>
+      <button id="btn-star-reset">実施回数リセット</button>
     </div>
   </div>
   <div class="nav-buttons">
@@ -122,6 +200,14 @@
   <div class="progress-buttons">
     <button id="btn-ng">苦手</button>
     <button id="btn-ok">できた</button>
+  </div>
+</div>
+<div class="overlay" id="score-overlay" hidden>
+  <div class="overlay-content">
+    <h2>成績</h2>
+    <p id="score-summary"></p>
+    <ul id="score-list"></ul>
+    <button id="btn-score-close">閉じる</button>
   </div>
 </div>
 
@@ -149,8 +235,17 @@ function renderChapterList() {
 let currentCards = [];
 let currentIndex = 0;
 let isFlipped = false;
+let selectedChoiceIndex = null;
+let sessionResults = {};
 
 const PROGRESS_KEY_PREFIX = 'bizlaw2seisen:progress:';
+const STAR_KEY_PREFIX = 'bizlaw2seisen:stars:';
+const MAX_STARS = 10;
+const JUDGMENT_RE = /(最も)?(適切|正しい|誤り)(（[〇✕○×]）)?(である|でない|くない)?/;
+
+function getChapterMeta(chapterNumber) {
+  return CHAPTERS.find((c) => c.number === chapterNumber);
+}
 
 function getProgress(id) {
   try {
@@ -161,8 +256,14 @@ function getProgress(id) {
 }
 
 function setProgress(id, status) {
+  const current = getProgress(id);
+  const next = current === status ? '' : status;
   try {
-    localStorage.setItem(PROGRESS_KEY_PREFIX + id, status);
+    if (next === '') {
+      localStorage.removeItem(PROGRESS_KEY_PREFIX + id);
+    } else {
+      localStorage.setItem(PROGRESS_KEY_PREFIX + id, next);
+    }
   } catch (e) {
     // localStorage unavailable (private mode, etc.) — ignore, state just won't persist
   }
@@ -175,11 +276,51 @@ function updateProgressButtons(id) {
   document.getElementById('btn-ng').classList.toggle('active', status === 'ng');
 }
 
+function getStarCount(id) {
+  try {
+    const raw = parseInt(localStorage.getItem(STAR_KEY_PREFIX + id), 10);
+    return Number.isFinite(raw) ? Math.min(MAX_STARS, Math.max(0, raw)) : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function incrementStarCount(id) {
+  const current = getStarCount(id);
+  if (current >= MAX_STARS) return;
+  try {
+    localStorage.setItem(STAR_KEY_PREFIX + id, String(current + 1));
+  } catch (e) {
+    // ignore
+  }
+  renderStarRow(id);
+}
+
+function resetStarCount(id) {
+  try {
+    localStorage.removeItem(STAR_KEY_PREFIX + id);
+  } catch (e) {
+    // ignore
+  }
+  renderStarRow(id);
+}
+
+function renderStarRow(id) {
+  const count = getStarCount(id);
+  const row = document.getElementById('star-row');
+  let stars = '';
+  for (let i = 0; i < MAX_STARS; i++) {
+    stars += i < count ? '★' : '☆';
+  }
+  row.textContent = stars;
+}
+
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function formatText(text) {
+function formatText(text, renderBold) {
+  if (renderBold === undefined) renderBold = true;
   const lines = text.split('\n');
   let html = '';
   let inList = false;
@@ -192,7 +333,14 @@ function formatText(text) {
     const isBullet = /^[*\-]\s+/.test(line);
     const isContinuation = !isBullet && inList && /^\s/.test(rawLine);
     const content = isBullet ? line.replace(/^[*\-]\s+/, '') : line;
-    const withBold = escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Bold markers in source material sometimes coincide with the correct answer
+    // (e.g. real cards 12-15, 15-1 bold the very choice that answerIndex points to).
+    // The question side must never render bold, or the front of the card leaks the
+    // answer before it's flipped — so bold is only ever rendered on the answer side
+    // (via formatExplanation, which calls this with renderBold left at its default).
+    const withBold = renderBold
+      ? escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      : escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '$1');
     const withUnderline = withBold.replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>');
     if (isBullet) {
       if (!inList) { html += '<ul>'; inList = true; }
@@ -206,6 +354,23 @@ function formatText(text) {
   }
   if (inList) html += '</ul>';
   return html;
+}
+
+function formatExplanation(text) {
+  const lines = text.split('\n').map((line) => {
+    const stripped = line.replace(/\*\*/g, '');
+    const bulletMatch = stripped.match(/^([*\-]\s+)(.*)$/);
+    const prefix = bulletMatch ? bulletMatch[1] : '';
+    const rest = bulletMatch ? bulletMatch[2] : stripped;
+    const jm = rest.match(JUDGMENT_RE);
+    if (jm && jm[0] && jm.index <= 20) {
+      const before = rest.slice(0, jm.index);
+      const after = rest.slice(jm.index + jm[0].length);
+      return `${prefix}${before}**${jm[0]}**${after}`;
+    }
+    return prefix + rest;
+  });
+  return formatText(lines.join('\n'));
 }
 
 function stripLeadingAnswerLine(text, answer) {
@@ -226,26 +391,116 @@ function startChapter(target) {
   currentCards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
   currentIndex = 0;
   isFlipped = false;
+  sessionResults = {};
   document.getElementById('chapter-screen').hidden = true;
   document.getElementById('card-screen').hidden = false;
   renderCard();
 }
 
-function renderCard() {
-  window.scrollTo(0, 0);
+function renderHeader(card) {
+  const meta = getChapterMeta(card.chapter);
+  document.getElementById('header-chapter').textContent =
+    `第${card.chapter}章 ${card.chapterTitle}（${meta ? meta.count : '?'}問）`;
+  document.getElementById('header-question').textContent =
+    `第${card.questionNumber}問　${card.title}`;
+}
+
+function renderChoices(card) {
+  const container = document.getElementById('choices-container');
+  container.innerHTML = '';
+
+  if (card.isProse) {
+    const spans = document.querySelectorAll('#question-text u');
+    spans.forEach((span, idx) => {
+      span.classList.add('choice-span');
+      span.dataset.choiceIndex = String(idx);
+      span.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectChoice(idx);
+      });
+    });
+    updateChoiceSelectionUI();
+    return;
+  }
+
+  card.choices.forEach((text, idx) => {
+    const div = document.createElement('div');
+    div.className = 'choice';
+    div.textContent = text;
+    div.dataset.choiceIndex = String(idx);
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectChoice(idx);
+    });
+    container.appendChild(div);
+  });
+  updateChoiceSelectionUI();
+}
+
+function selectChoice(idx) {
   const card = currentCards[currentIndex];
+  const isNewSelection = selectedChoiceIndex !== idx;
+  selectedChoiceIndex = selectedChoiceIndex === idx ? null : idx;
+  updateChoiceSelectionUI();
+  if (isNewSelection && selectedChoiceIndex !== null) {
+    incrementStarCount(card.id);
+  }
+}
+
+function updateChoiceSelectionUI() {
+  document.querySelectorAll('.choice, #question-text u.choice-span').forEach((el) => {
+    const idx = Number(el.dataset.choiceIndex);
+    el.classList.toggle('selected', idx === selectedChoiceIndex);
+  });
+}
+
+function recordAnswerIfNeeded(card) {
+  if (card.answerIndex === null || card.answerIndex === undefined) return;
+  if (selectedChoiceIndex === null) return;
+  sessionResults[card.id] = selectedChoiceIndex === card.answerIndex ? 'correct' : 'incorrect';
+}
+
+function renderCard() {
+  const card = currentCards[currentIndex];
+  selectedChoiceIndex = null;
+
+  window.scrollTo(0, 0);
   document.getElementById('progress-label').textContent = `${currentIndex + 1} / ${currentCards.length}`;
   const slider = document.getElementById('slider');
   slider.min = 1;
   slider.max = currentCards.length;
   slider.value = currentIndex + 1;
+
+  renderHeader(card);
+  document.getElementById('question-text').innerHTML = formatText(card.prompt, false);
+  renderChoices(card);
   document.getElementById('exam-ref').textContent = card.examRef;
-  document.getElementById('question-text').innerHTML = formatText(card.question);
   document.getElementById('answer-text').innerHTML =
-    `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` + formatText(stripLeadingAnswerLine(card.explanation, card.answer));
+    `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` +
+    formatExplanation(stripLeadingAnswerLine(card.explanation, card.answer));
   document.getElementById('card').classList.toggle('flipped', isFlipped);
   updateProgressButtons(card.id);
+  renderStarRow(card.id);
 }
+
+document.getElementById('card').addEventListener('click', () => {
+  const card = currentCards[currentIndex];
+  isFlipped = !isFlipped;
+  if (isFlipped) {
+    recordAnswerIfNeeded(card);
+  }
+  document.getElementById('card').classList.toggle('flipped', isFlipped);
+});
+
+document.getElementById('btn-star-reset').addEventListener('click', (e) => {
+  e.stopPropagation();
+  resetStarCount(currentCards[currentIndex].id);
+});
+
+document.getElementById('btn-back').addEventListener('click', () => {
+  document.getElementById('card-screen').hidden = true;
+  document.getElementById('chapter-screen').hidden = false;
+});
 
 function goNext() {
   if (currentIndex < currentCards.length - 1) {
@@ -283,14 +538,26 @@ document.getElementById('btn-ng').addEventListener('click', () => {
   setProgress(currentCards[currentIndex].id, 'ng');
 });
 
-document.getElementById('card').addEventListener('click', () => {
-  isFlipped = !isFlipped;
-  document.getElementById('card').classList.toggle('flipped', isFlipped);
-});
+function showScoreOverlay() {
+  const entries = Object.entries(sessionResults);
+  const correct = entries.filter(([, v]) => v === 'correct').length;
+  const total = entries.length;
+  document.getElementById('score-summary').textContent =
+    total === 0 ? 'まだ回答していません' : `${total}問中${correct}問正解`;
+  const list = currentCards
+    .filter((c) => sessionResults[c.id])
+    .map((c) => `<li>第${c.questionNumber}問（${c.title}）: ${sessionResults[c.id] === 'correct' ? '正解' : '不正解'}</li>`)
+    .join('');
+  document.getElementById('score-list').innerHTML = list;
+  document.getElementById('score-overlay').hidden = false;
+}
 
-document.getElementById('btn-back').addEventListener('click', () => {
-  document.getElementById('card-screen').hidden = true;
-  document.getElementById('chapter-screen').hidden = false;
+document.getElementById('btn-score').addEventListener('click', (e) => {
+  e.stopPropagation();
+  showScoreOverlay();
+});
+document.getElementById('btn-score-close').addEventListener('click', () => {
+  document.getElementById('score-overlay').hidden = true;
 });
 
 renderChapterList();
