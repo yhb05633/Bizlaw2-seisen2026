@@ -108,7 +108,10 @@ def parse_block(block_text: str) -> dict:
     if answer_match:
         answer = answer_match.group(1).strip().strip("*").strip()
     else:
-        answer = next((l.strip() for l in explanation_source if l.strip()), "")
+        answer = next(
+            (l.strip().strip("*").strip() for l in explanation_source if l.strip()),
+            "",
+        )
 
     return {
         "examRef": exam_ref,
@@ -116,3 +119,57 @@ def parse_block(block_text: str) -> dict:
         "answer": answer,
         "explanation": explanation_text,
     }
+
+
+def write_cards_js(cards: list[dict]) -> None:
+    chapters_json = json.dumps(CHAPTERS, ensure_ascii=False, indent=2)
+    cards_json = json.dumps(cards, ensure_ascii=False, indent=2)
+    content = f"const CHAPTERS = {chapters_json};\n\nconst CARDS = {cards_json};\n"
+    OUTPUT_PATH.write_text(content, encoding="utf-8")
+
+
+def main() -> None:
+    all_cards = []
+    errors = []
+
+    for chapter in CHAPTERS:
+        file_path = SOURCE_DIR / f"{chapter['number']:02d}.txt"
+        text = file_path.read_text(encoding="utf-8")
+        blocks = split_into_question_blocks(text)
+
+        if len(blocks) != chapter["count"]:
+            errors.append(
+                f"{file_path.name}: expected {chapter['count']} questions, "
+                f"found {len(blocks)}"
+            )
+
+        for i, block in enumerate(blocks, start=1):
+            try:
+                parsed = parse_block(block)
+            except ValueError as e:
+                errors.append(f"{file_path.name} question {i}: {e}")
+                continue
+            all_cards.append(
+                {
+                    "id": f"{chapter['number']}-{i}",
+                    "chapter": chapter["number"],
+                    "chapterTitle": chapter["title"],
+                    "examRef": parsed["examRef"],
+                    "question": parsed["question"],
+                    "answer": parsed["answer"],
+                    "explanation": parsed["explanation"],
+                }
+            )
+
+    if errors:
+        print("パースに問題があります:")
+        for e in errors:
+            print(f"  - {e}")
+        raise SystemExit(1)
+
+    write_cards_js(all_cards)
+    print(f"OK: {len(all_cards)} 問を書き出しました -> {OUTPUT_PATH}")
+
+
+if __name__ == "__main__":
+    main()

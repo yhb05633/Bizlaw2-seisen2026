@@ -115,6 +115,23 @@ class TestParseBlock(unittest.TestCase):
         self.assertEqual(result["answer"], "⑤")
         self.assertIn("説明です。", result["explanation"])
 
+    def test_separate_kaitou_heading_with_bold_wrapped_answer(self):
+        # Real-data variant (e.g. 10.txt): the "### 解答" heading's value is on
+        # its own line, wrapped in markdown bold, with no "正解："/"解答：" prefix.
+        block = (
+            "## 第1問（第45回 第10問 10-1）\n"
+            "本文です。\n\n"
+            "---\n\n"
+            "### 解答\n"
+            "**③**\n\n"
+            "---\n\n"
+            "### 解説\n\n"
+            "* **① 適切でない**：説明です。\n"
+        )
+        result = parse_block(block)
+        self.assertEqual(result["answer"], "③")
+        self.assertIn("説明です。", result["explanation"])
+
     def test_no_boundary_raises(self):
         block = "#### 第1問（第1回 第1問 1-1）\n本文だけで解答がありません。\n"
         with self.assertRaises(ValueError):
