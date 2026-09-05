@@ -139,6 +139,20 @@ function formatText(text) {
   return html;
 }
 
+function stripLeadingAnswerLine(text, answer) {
+  const lines = text.split('\n');
+  let i = 0;
+  while (i < lines.length && lines[i].trim() === '') i++;
+  if (i < lines.length) {
+    const normalized = lines[i].trim().replace(/^\*+|\*+$/g, '').trim();
+    const answerNormalized = normalized.replace(/^正解[:：]\s*/, '');
+    if (normalized === answer || answerNormalized === answer) {
+      lines.splice(0, i + 1);
+    }
+  }
+  return lines.join('\n');
+}
+
 function startChapter(target) {
   currentCards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
   currentIndex = 0;
@@ -154,7 +168,7 @@ function renderCard() {
   document.getElementById('exam-ref').textContent = card.examRef;
   document.getElementById('question-text').innerHTML = formatText(card.question);
   document.getElementById('answer-text').innerHTML =
-    `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` + formatText(card.explanation);
+    `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` + formatText(stripLeadingAnswerLine(card.explanation, card.answer));
   document.getElementById('card').classList.toggle('flipped', isFlipped);
 }
 
