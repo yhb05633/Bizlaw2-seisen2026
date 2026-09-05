@@ -45,6 +45,21 @@
     border: 1px solid #d6d3d1;
     background: white;
   }
+  #slider { width: calc(100% - 32px); margin: 0 16px 8px; }
+  .nav-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 16px 16px;
+  }
+  .nav-buttons button {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+    font-size: 1rem;
+  }
   #card {
     margin: 0 16px 16px;
     border: 1px solid #d6d3d1;
@@ -73,6 +88,7 @@
     <button id="btn-back">← 章一覧</button>
     <span id="progress-label"></span>
   </div>
+  <input type="range" id="slider" min="1" max="1" value="1">
   <div id="card">
     <div class="card-face card-front">
       <div id="exam-ref" class="exam-ref"></div>
@@ -82,6 +98,10 @@
     <div class="card-face card-back">
       <div id="answer-text"></div>
     </div>
+  </div>
+  <div class="nav-buttons">
+    <button id="btn-prev">前へ</button>
+    <button id="btn-next">次へ</button>
   </div>
 </div>
 
@@ -165,12 +185,46 @@ function startChapter(target) {
 function renderCard() {
   const card = currentCards[currentIndex];
   document.getElementById('progress-label').textContent = `${currentIndex + 1} / ${currentCards.length}`;
+  const slider = document.getElementById('slider');
+  slider.min = 1;
+  slider.max = currentCards.length;
+  slider.value = currentIndex + 1;
   document.getElementById('exam-ref').textContent = card.examRef;
   document.getElementById('question-text').innerHTML = formatText(card.question);
   document.getElementById('answer-text').innerHTML =
     `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` + formatText(stripLeadingAnswerLine(card.explanation, card.answer));
   document.getElementById('card').classList.toggle('flipped', isFlipped);
 }
+
+function goNext() {
+  if (currentIndex < currentCards.length - 1) {
+    currentIndex++;
+    isFlipped = false;
+    renderCard();
+  }
+}
+
+function goPrev() {
+  if (currentIndex > 0) {
+    currentIndex--;
+    isFlipped = false;
+    renderCard();
+  }
+}
+
+document.getElementById('btn-next').addEventListener('click', (e) => {
+  e.stopPropagation();
+  goNext();
+});
+document.getElementById('btn-prev').addEventListener('click', (e) => {
+  e.stopPropagation();
+  goPrev();
+});
+document.getElementById('slider').addEventListener('input', (e) => {
+  currentIndex = Number(e.target.value) - 1;
+  isFlipped = false;
+  renderCard();
+});
 
 document.getElementById('card').addEventListener('click', () => {
   isFlipped = !isFlipped;
