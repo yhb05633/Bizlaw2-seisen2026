@@ -68,6 +68,26 @@ def normalize_choice_text(text: str) -> str:
     return text
 
 
+ANSWER_PAREN_GROUP_RE = re.compile(r"^(.*?)[（(](.+)[）)]\s*$")
+
+
+def normalize_answer_text(answer: str) -> str:
+    # The "answer" field often repeats the same combination text shown in
+    # `choices` (e.g. "①（ア：〇 イ：〇...）"), just wrapped in a leading
+    # marker and parentheses instead of standing alone. Normalize that
+    # inner text the same way, so the back-of-card "正解：..." line never
+    # shows a different separator style than the front-of-card choice it
+    # restates.
+    m = ANSWER_PAREN_GROUP_RE.match(answer)
+    if not m:
+        return answer
+    prefix, inner = m.group(1), m.group(2)
+    normalized_inner = normalize_choice_text(inner)
+    if normalized_inner == inner:
+        return answer
+    return f"{prefix}（{normalized_inner}）"
+
+
 def to_int(s: str) -> int:
     return int("".join(FULLWIDTH_DIGITS.get(ch, ch) for ch in s))
 
@@ -310,7 +330,8 @@ def main() -> None:
 
             title = titles[i - 1] if i - 1 < len(titles) else ""
             prompt, choices, is_prose = split_prompt_and_choices(parsed["question"])
-            answer_index = compute_answer_index(parsed["answer"])
+            answer = normalize_answer_text(parsed["answer"])
+            answer_index = compute_answer_index(answer)
             if is_prose:
                 prose_count += 1
             if answer_index is None:
@@ -328,7 +349,7 @@ def main() -> None:
                     "prompt": prompt,
                     "choices": choices,
                     "answerIndex": answer_index,
-                    "answer": parsed["answer"],
+                    "answer": answer,
                     "explanation": parsed["explanation"],
                 }
             )

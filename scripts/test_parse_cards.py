@@ -10,6 +10,7 @@ from parse_cards import (
     split_prompt_and_choices,
     compute_answer_index,
     normalize_choice_text,
+    normalize_answer_text,
 )
 
 
@@ -368,6 +369,26 @@ class TestNormalizeChoiceText(unittest.TestCase):
             normalize_choice_text("ア―✕ イ―✕  ウ―〇  エ―✕  オ―✕"),
             "ア－✕、イ－✕、ウ－〇、エ－✕、オ－✕",
         )
+
+
+class TestNormalizeAnswerText(unittest.TestCase):
+    def test_normalizes_ox_combination_inside_parens(self):
+        self.assertEqual(
+            normalize_answer_text("①（ア：〇 イ：〇 ウ：✕ エ：〇 オ：〇）"),
+            "①（ア－〇、イ－〇、ウ－✕、エ－〇、オ－〇）",
+        )
+
+    def test_normalizes_bare_katakana_combo_inside_parens(self):
+        self.assertEqual(normalize_answer_text("③（アエオ）"), "③（ア・エ・オ）")
+
+    def test_leaves_already_canonical_answer_unchanged(self):
+        self.assertEqual(
+            normalize_answer_text("④（ア－✕、イ－〇、ウ－〇、エ－✕）"),
+            "④（ア－✕、イ－〇、ウ－〇、エ－✕）",
+        )
+
+    def test_leaves_answer_without_parens_unchanged(self):
+        self.assertEqual(normalize_answer_text("③"), "③")
 
 
 if __name__ == "__main__":
