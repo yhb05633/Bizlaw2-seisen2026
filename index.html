@@ -190,14 +190,18 @@ function formatText(text) {
       continue;
     }
     const isBullet = /^[*\-]\s+/.test(line);
+    const isContinuation = !isBullet && inList && /^\s/.test(rawLine);
     const content = isBullet ? line.replace(/^[*\-]\s+/, '') : line;
     const withBold = escapeHtml(content).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    const withUnderline = withBold.replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>');
     if (isBullet) {
       if (!inList) { html += '<ul>'; inList = true; }
-      html += `<li>${withBold}</li>`;
+      html += `<li>${withUnderline}</li>`;
+    } else if (isContinuation) {
+      html = html.replace(/<\/li>$/, ` ${withUnderline}</li>`);
     } else {
       if (inList) { html += '</ul>'; inList = false; }
-      html += `<p>${withBold}</p>`;
+      html += `<p>${withUnderline}</p>`;
     }
   }
   if (inList) html += '</ul>';
@@ -228,6 +232,7 @@ function startChapter(target) {
 }
 
 function renderCard() {
+  window.scrollTo(0, 0);
   const card = currentCards[currentIndex];
   document.getElementById('progress-label').textContent = `${currentIndex + 1} / ${currentCards.length}`;
   const slider = document.getElementById('slider');
@@ -292,7 +297,7 @@ renderChapterList();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js');
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   });
 }
 </script>

@@ -49,6 +49,10 @@ def normalize_label_line(line: str) -> str:
     return s
 
 
+def _clean_value(s: str) -> str:
+    return s.strip().strip("*").strip()
+
+
 def split_into_question_blocks(text: str) -> list[str]:
     matches = list(BLOCK_START_RE.finditer(text))
     blocks = []
@@ -99,17 +103,19 @@ def parse_block(block_text: str) -> dict:
 
     def is_explanation_noise(line: str) -> bool:
         norm = normalize_label_line(line)
-        return norm == "解説" or SEPARATOR_RE.match(line.strip()) is not None
+        if norm == "解説" or SEPARATOR_RE.match(line.strip()) is not None:
+            return True
+        return re.match(r"^#{1,6}[\s　]", line.strip()) is not None
 
     explanation_source = [l for l in after_lines if not is_explanation_noise(l)]
     explanation_text = "\n".join(explanation_source).strip()
 
     answer_match = ANSWER_VALUE_RE.search(explanation_text)
     if answer_match:
-        answer = answer_match.group(1).strip().strip("*").strip()
+        answer = _clean_value(answer_match.group(1))
     else:
         answer = next(
-            (l.strip().strip("*").strip() for l in explanation_source if l.strip()),
+            (_clean_value(l) for l in explanation_source if l.strip()),
             "",
         )
 

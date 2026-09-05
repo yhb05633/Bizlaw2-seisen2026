@@ -137,6 +137,31 @@ class TestParseBlock(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_block(block)
 
+    def test_strips_trailing_heading_leaked_from_next_question(self):
+        block = (
+            "#### 第1問（第1回 第1問 1-1）\n"
+            "本文です。\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①**\n\n"
+            "説明文です。\n\n"
+            "### 2 意思表示\n"
+        )
+        result = parse_block(block)
+        self.assertNotIn("意思表示", result["explanation"])
+        self.assertIn("説明文です。", result["explanation"])
+
+    def test_strips_trailing_heading_with_ideographic_space(self):
+        block = (
+            "#### 第1問（第1回 第1問 1-1）\n"
+            "本文です。\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①**\n\n"
+            "説明文です。\n\n"
+            "####　株主総会\n"
+        )
+        result = parse_block(block)
+        self.assertNotIn("株主総会", result["explanation"])
+
 
 if __name__ == "__main__":
     unittest.main()
