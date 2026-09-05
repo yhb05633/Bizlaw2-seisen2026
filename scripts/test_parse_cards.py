@@ -164,6 +164,13 @@ class TestParseBlock(unittest.TestCase):
             result["explanation"],
         )
         self.assertNotIn("ア：〇", result["explanation"])
+        # The trailing "**" that closes the bold markdown span belongs to
+        # the explanation text, not the answer value, and must survive
+        # the patch.
+        self.assertIn(
+            "正解：①（ア－〇、イ－〇、ウ－✕、エ－〇、オ－〇）**",
+            result["explanation"],
+        )
 
     def test_strips_trailing_heading_leaked_from_next_question(self):
         block = (

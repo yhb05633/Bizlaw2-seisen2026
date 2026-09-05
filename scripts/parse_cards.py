@@ -295,10 +295,19 @@ def parse_block(block_text: str) -> dict:
         # (`stripLeadingAnswerLine`), so once `answer` is normalized this
         # copy must be too, or the dedup silently breaks and the answer
         # line is shown twice (once normalized, once not).
+        #
+        # ANSWER_VALUE_RE's group is greedy to end-of-line, so it can
+        # include trailing markdown decoration (e.g. a closing "**") that
+        # _clean_value() strips for comparison but that still belongs in
+        # the explanation text. Only the actual value portion is replaced;
+        # any trailing whitespace/asterisks are left untouched.
+        raw_group = answer_match.group(1)
+        trailing_len = len(raw_group) - len(raw_group.rstrip(" \t*"))
+        value_end = answer_match.end(1) - trailing_len
         explanation_text = (
             explanation_text[: answer_match.start(1)]
             + answer
-            + explanation_text[answer_match.end(1) :]
+            + explanation_text[value_end:]
         )
 
     return {
