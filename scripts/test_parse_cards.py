@@ -418,5 +418,23 @@ class TestNormalizeAnswerText(unittest.TestCase):
         self.assertEqual(normalize_answer_text("③"), "③")
 
 
+class TestNormalizeChoiceTextLatinLetters(unittest.TestCase):
+    def test_inserts_nakaguro_between_space_separated_latin_letters(self):
+        self.assertEqual(normalize_choice_text("a b c"), "a・b・c")
+
+    def test_inserts_nakaguro_between_bare_concatenated_latin_letters(self):
+        self.assertEqual(normalize_choice_text("abc"), "a・b・c")
+
+    def test_strips_parens_and_inserts_nakaguro(self):
+        self.assertEqual(normalize_choice_text("（a）（b）（c）"), "a・b・c")
+
+    def test_leaves_already_separated_latin_letters_unchanged(self):
+        self.assertEqual(normalize_choice_text("a・b・c"), "a・b・c")
+
+    def test_leaves_prose_choice_text_unchanged(self):
+        text = "Xは、消費者Yに商品を売却する旨の売買契約をYとの間で締結した。"
+        self.assertEqual(normalize_choice_text(text), text)
+
+
 if __name__ == "__main__":
     unittest.main()

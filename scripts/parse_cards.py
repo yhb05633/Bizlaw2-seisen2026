@@ -10,7 +10,7 @@ import pathlib
 import re
 
 SOURCE_DIR = pathlib.Path(
-    "/Volumes/Macmini M2PRO/専門スキル/法務書籍/Legalstudy2026/ビジ法検定_/ビジ法２精選"
+    "/Volumes/Macmini M2PRO/専門スキル/法務書籍/Legalstudy2026/ビジ法２精選"
 )
 OUTPUT_PATH = pathlib.Path(__file__).resolve().parent.parent / "cards.js"
 
@@ -52,6 +52,8 @@ HEADING_NUMBER_RE = re.compile(r"^#{0,6}\s*第([0-9０-９]+)問")
 ANSWER_PAREN_NUMBER_RE = re.compile(r"^[（(]\s*([0-9０-９])\s*[）)]\s*$")
 
 KATAKANA_COMBO_RE = re.compile(r"^[アイウエオカキクケコ]{2,}$")
+LATIN_COMBO_LINE_RE = re.compile(r"^(?:[（(]?[a-e][）)]?[\s・]*){2,}$")
+LATIN_LETTER_TOKEN_RE = re.compile(r"[（(]?([a-e])[）)]?")
 OX_LINE_RE = re.compile(
     r"^[ア-ン]\s*[-－：―]\s*[〇✕]"
     r"(?:\s*[、/／,，]?\s*[ア-ン]\s*[-－：―]\s*[〇✕])*$"
@@ -62,6 +64,10 @@ OX_TOKEN_RE = re.compile(r"([ア-ン])\s*[-－：―]\s*([〇✕])")
 def normalize_choice_text(text: str) -> str:
     if KATAKANA_COMBO_RE.match(text):
         return "・".join(text)
+    if LATIN_COMBO_LINE_RE.match(text):
+        letters = LATIN_LETTER_TOKEN_RE.findall(text)
+        if len(letters) >= 2:
+            return "・".join(letters)
     if OX_LINE_RE.match(text):
         tokens = OX_TOKEN_RE.findall(text)
         return "、".join(f"{letter}－{symbol}" for letter, symbol in tokens)
