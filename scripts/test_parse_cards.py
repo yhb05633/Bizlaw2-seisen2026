@@ -145,6 +145,26 @@ class TestParseBlock(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_block(block)
 
+    def test_normalizes_answer_and_its_echo_in_explanation_consistently(self):
+        block = (
+            "#### 第1問（第1回 第1問 1-1）\n"
+            "**設問**\n"
+            "本文です。\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①（ア：〇 イ：〇 ウ：✕ エ：〇 オ：〇）**\n\n"
+            "説明文です。\n"
+        )
+        result = parse_block(block)
+        self.assertEqual(result["answer"], "①（ア－〇、イ－〇、ウ－✕、エ－〇、オ－〇）")
+        # The explanation's own leading line must be patched to the exact
+        # same normalized text, since the frontend dedupes the two by
+        # exact string comparison.
+        self.assertIn(
+            "正解：①（ア－〇、イ－〇、ウ－✕、エ－〇、オ－〇）",
+            result["explanation"],
+        )
+        self.assertNotIn("ア：〇", result["explanation"])
+
     def test_strips_trailing_heading_leaked_from_next_question(self):
         block = (
             "#### 第1問（第1回 第1問 1-1）\n"

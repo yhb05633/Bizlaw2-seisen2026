@@ -280,11 +280,25 @@ def parse_block(block_text: str) -> dict:
 
     answer_match = ANSWER_VALUE_RE.search(explanation_text)
     if answer_match:
-        answer = _clean_value(answer_match.group(1))
+        raw_answer = _clean_value(answer_match.group(1))
     else:
-        answer = next(
+        raw_answer = next(
             (_clean_value(l) for l in explanation_source if l.strip()),
             "",
+        )
+
+    answer = normalize_answer_text(raw_answer)
+    if answer_match and answer != raw_answer:
+        # The explanation's own leading "正解：..." line is a separate,
+        # independently-authored copy of the same combination text. The
+        # frontend dedupes it against `answer` by exact string match
+        # (`stripLeadingAnswerLine`), so once `answer` is normalized this
+        # copy must be too, or the dedup silently breaks and the answer
+        # line is shown twice (once normalized, once not).
+        explanation_text = (
+            explanation_text[: answer_match.start(1)]
+            + answer
+            + explanation_text[answer_match.end(1) :]
         )
 
     return {
@@ -330,8 +344,7 @@ def main() -> None:
 
             title = titles[i - 1] if i - 1 < len(titles) else ""
             prompt, choices, is_prose = split_prompt_and_choices(parsed["question"])
-            answer = normalize_answer_text(parsed["answer"])
-            answer_index = compute_answer_index(answer)
+            answer_index = compute_answer_index(parsed["answer"])
             if is_prose:
                 prose_count += 1
             if answer_index is None:
@@ -349,7 +362,7 @@ def main() -> None:
                     "prompt": prompt,
                     "choices": choices,
                     "answerIndex": answer_index,
-                    "answer": answer,
+                    "answer": parsed["answer"],
                     "explanation": parsed["explanation"],
                 }
             )
