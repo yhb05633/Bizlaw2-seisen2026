@@ -3,7 +3,13 @@ import pathlib
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from parse_cards import split_into_question_blocks, parse_block
+from parse_cards import (
+    split_into_question_blocks,
+    parse_block,
+    extract_titles,
+    split_prompt_and_choices,
+    compute_answer_index,
+)
 
 
 class TestSplitIntoQuestionBlocks(unittest.TestCase):
@@ -161,6 +167,131 @@ class TestParseBlock(unittest.TestCase):
         )
         result = parse_block(block)
         self.assertNotIn("株主総会", result["explanation"])
+
+
+class TestExtractTitles(unittest.TestCase):
+    def test_extracts_one_title_per_question_various_heading_styles(self):
+        text = (
+            "## 第１章 テスト\n\n"
+            "### 行為能力\n"
+            "#### 第1問（第45回 第3問 3-3）\n"
+            "本文A\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①**\n\n"
+            "---\n\n"
+            "####　株主総会\n"
+            "##### 第2問（第40回 第1問 1-1）\n"
+            "本文B\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：②**\n"
+        )
+        titles = extract_titles(text)
+        self.assertEqual(titles, ["行為能力", "株主総会"])
+
+    def test_falls_back_to_previous_title_when_missing(self):
+        text = (
+            "### 独占禁止法\n"
+            "#### 第1問（第1回 第1問 1-1）\n"
+            "本文A\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：①**\n\n"
+            "#### 第2問（第1回 第2問 2-1）\n"
+            "本文B\n\n"
+            "##### 【解答・解説】\n"
+            "**正解：②**\n"
+        )
+        titles = extract_titles(text)
+        self.assertEqual(titles, ["独占禁止法", "独占禁止法"])
+
+
+class TestSplitPromptAndChoices(unittest.TestCase):
+    def test_splits_clean_five_choice_question(self):
+        question = (
+            "次のア〜オのうち適切なものの組み合わせを選びなさい。\n\n"
+            "ア．文A\n"
+            "イ．文B\n\n"
+            "① アイ\n"
+            "② **アウ**\n"
+            "③ アエ\n"
+            "④ アオ\n"
+            "⑤ イウ"
+        )
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(len(choices), 5)
+        self.assertEqual(choices[0], "① アイ")
+        self.assertEqual(choices[1], "② アウ")
+        self.assertNotIn("*", choices[1])
+
+    def test_supports_six_choices(self):
+        lines = "\n".join(f"{c} 選択肢{c}" for c in "①②③④⑤⑥")
+        question = "設問文\n\n" + lines
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(len(choices), 6)
+
+    def test_supports_arabic_markers(self):
+        lines = "\n".join(f"{n}．選択肢{n}" for n in range(1, 6))
+        question = "設問文\n\n" + lines
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(len(choices), 5)
+        self.assertTrue(choices[0].startswith("①"))
+
+    def test_falls_back_to_prose_when_u_tag_present(self):
+        question = "本文①<u>下線部分</u>と②<u>別の下線部分</u>です。"
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertTrue(is_prose)
+        self.assertEqual(choices, [])
+        self.assertEqual(prompt, question)
+
+    def test_falls_back_to_prose_when_trailing_note_after_choices(self):
+        question = (
+            "設問文\n\n"
+            "① アイ\n"
+            "② アウ\n"
+            "③ アエ\n\n"
+            "※注記があります。"
+        )
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertTrue(is_prose)
+        self.assertEqual(choices, [])
+
+    def test_falls_back_to_prose_when_choice_has_continuation_line(self):
+        question = (
+            "設問文\n\n"
+            "① 甲「質問1」\n"
+            "   乙「回答1」\n"
+            "② 甲「質問2」\n"
+            "   乙「回答2」\n"
+            "③ 甲「質問3」\n"
+            "   乙「回答3」"
+        )
+        prompt, choices, is_prose = split_prompt_and_choices(question)
+        self.assertTrue(is_prose)
+        self.assertEqual(choices, [])
+
+
+class TestComputeAnswerIndex(unittest.TestCase):
+    def test_circled_marker(self):
+        self.assertEqual(compute_answer_index("④（ア－✕、イ－〇）"), 3)
+
+    def test_bare_circled_marker(self):
+        self.assertEqual(compute_answer_index("①"), 0)
+
+    def test_arabic_marker(self):
+        self.assertEqual(compute_answer_index("1"), 0)
+
+    def test_unrecognized_returns_none(self):
+        self.assertIsNone(compute_answer_index("該当なし"))
+
+    def test_fullwidth_paren_arabic_digit(self):
+        # Real-data variant (e.g. 02.txt): the answer is given as a
+        # fullwidth-paren arabic digit even though the question's own
+        # choices are circled markers. The digit is still a 1-based
+        # position into those choices.
+        self.assertEqual(compute_answer_index("（2）"), 1)
+        self.assertEqual(compute_answer_index("（5）"), 4)
 
 
 if __name__ == "__main__":

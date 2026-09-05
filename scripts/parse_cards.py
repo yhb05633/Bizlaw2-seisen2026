@@ -40,6 +40,142 @@ BOUNDARY_RE = re.compile(r"^(解答[・、]?解説|解答|正解)[:：]?\s*(.*)$
 ANSWER_VALUE_RE = re.compile(r"(?:正解|解答)[:：]\s*([^\n]+)")
 SEPARATOR_RE = re.compile(r"^-{3,}$")
 
+CHOICE_MARKER_CHARS = "①②③④⑤⑥⑦⑧⑨⑩"
+FULLWIDTH_DIGITS = {
+    "０": "0", "１": "1", "２": "2", "３": "3", "４": "4",
+    "５": "5", "６": "6", "７": "7", "８": "8", "９": "9",
+}
+CHOICE_LINE_RE = re.compile(
+    r"^(?:[*\-]\s+)?\*{0,2}(?:([①-⑩])|([0-9０-９])[.．、\)）]?)\*{0,2}\s*(.*)$"
+)
+HEADING_NUMBER_RE = re.compile(r"^#{0,6}\s*第([0-9０-９]+)問")
+ANSWER_PAREN_NUMBER_RE = re.compile(r"^[（(]\s*([0-9０-９])\s*[）)]\s*$")
+
+
+def to_int(s: str) -> int:
+    return int("".join(FULLWIDTH_DIGITS.get(ch, ch) for ch in s))
+
+
+def normalize_title_line(line: str) -> str:
+    s = normalize_label_line(line)
+    s = re.sub(r"^[0-9０-９]+[\s　]+", "", s)
+    return s
+
+
+TITLE_NOISE_WORDS = {"設問", "問題"}
+
+
+def extract_titles(text: str) -> list[str]:
+    matches = list(BLOCK_START_RE.finditer(text))
+    titles = []
+    prev_end = 0
+    last_title = ""
+    for m in matches:
+        gap = text[prev_end:m.start()]
+        candidate = None
+        for line in reversed(gap.splitlines()):
+            s = line.strip()
+            if s == "" or SEPARATOR_RE.match(s):
+                continue
+            # Per-choice explanation bullets ("* **ア：適切でない。**",
+            # "* **①：適切である。**") are markdown list items and are the
+            # most common non-blank line right before the next question's
+            # heading when no new subsection title was actually given (i.e.
+            # this and the previous question share one title). They must
+            # not be mistaken for a title line, so bullet-prefixed lines
+            # are never candidates, regardless of their own decoration.
+            if re.match(r"^[*\-]\s", s):
+                continue
+            if BLOCK_START_RE.match(s):
+                continue
+            norm = normalize_label_line(s)
+            if BOUNDARY_RE.match(norm) or norm in TITLE_NOISE_WORDS:
+                continue
+            if not re.match(r"^[#*]|^【", s):
+                continue
+            title_norm = normalize_title_line(s)
+            if title_norm == "":
+                continue
+            candidate = title_norm
+            break
+        title = candidate if candidate is not None else last_title
+        titles.append(title)
+        last_title = title
+        prev_end = m.start()
+    return titles
+
+
+def _marker_value(circled, digit):
+    if circled:
+        return CHOICE_MARKER_CHARS.index(circled) + 1
+    d = FULLWIDTH_DIGITS.get(digit, digit)
+    return int(d)
+
+
+def split_prompt_and_choices(question_text: str):
+    if "<u>" in question_text:
+        return question_text, [], True
+
+    lines = question_text.split("\n")
+    nonblank = [(i, l) for i, l in enumerate(lines) if l.strip() != ""]
+
+    marker_positions = []
+    for pos, (_, line) in enumerate(nonblank):
+        m = CHOICE_LINE_RE.match(line.strip())
+        if m:
+            marker_positions.append((pos, _marker_value(m.group(1), m.group(2))))
+
+    if not marker_positions:
+        return question_text, [], True
+
+    last_nonblank_pos = len(nonblank) - 1
+    if marker_positions[-1][0] != last_nonblank_pos:
+        return question_text, [], True
+
+    run = [marker_positions[-1]]
+    for entry in reversed(marker_positions[:-1]):
+        prev_pos, prev_val = run[-1]
+        pos, val = entry
+        if pos == prev_pos - 1 and val == prev_val - 1:
+            run.append(entry)
+        else:
+            break
+    run.reverse()
+
+    if len(run) < 3 or run[0][1] != 1:
+        return question_text, [], True
+
+    start_nonblank_pos = run[0][0]
+    start_line_idx = nonblank[start_nonblank_pos][0]
+
+    prompt = "\n".join(lines[:start_line_idx]).strip()
+
+    choices = []
+    for pos, _ in run:
+        line_idx, line = nonblank[pos]
+        m = CHOICE_LINE_RE.match(line.strip())
+        text = m.group(3).strip().replace("**", "")
+        marker_val = _marker_value(m.group(1), m.group(2))
+        marker_char = CHOICE_MARKER_CHARS[marker_val - 1]
+        choices.append(f"{marker_char} {text}")
+
+    return prompt, choices, False
+
+
+def compute_answer_index(answer: str):
+    stripped = answer.strip()
+    m = CHOICE_LINE_RE.match(stripped)
+    if m:
+        return _marker_value(m.group(1), m.group(2)) - 1
+    # Some source files (e.g. 02.txt) give the answer as a fullwidth-paren
+    # arabic digit like "（2）" even though the question's own choices are
+    # circled markers (①②③...). The digit is a 1-based choice position
+    # either way, so it converts the same way as any other marker.
+    m2 = ANSWER_PAREN_NUMBER_RE.match(stripped)
+    if m2:
+        return to_int(m2.group(1)) - 1
+    return None
+
 
 def normalize_label_line(line: str) -> str:
     s = line.strip()
@@ -72,6 +208,9 @@ def parse_block(block_text: str) -> dict:
     rest = heading_match.group(1) if heading_match else ""
     paren_match = PAREN_RE.search(rest)
     exam_ref = paren_match.group(1).strip() if paren_match else ""
+
+    num_match = HEADING_NUMBER_RE.match(heading_line.strip())
+    question_number = to_int(num_match.group(1)) if num_match else None
 
     boundary_idx = None
     inline_after = ""
@@ -124,6 +263,7 @@ def parse_block(block_text: str) -> dict:
         "question": question_text,
         "answer": answer,
         "explanation": explanation_text,
+        "questionNumber": question_number,
     }
 
 
@@ -137,11 +277,14 @@ def write_cards_js(cards: list[dict]) -> None:
 def main() -> None:
     all_cards = []
     errors = []
+    prose_count = 0
+    unscored_count = 0
 
     for chapter in CHAPTERS:
         file_path = SOURCE_DIR / f"{chapter['number']:02d}.txt"
         text = file_path.read_text(encoding="utf-8")
         blocks = split_into_question_blocks(text)
+        titles = extract_titles(text)
 
         if len(blocks) != chapter["count"]:
             errors.append(
@@ -155,13 +298,27 @@ def main() -> None:
             except ValueError as e:
                 errors.append(f"{file_path.name} question {i}: {e}")
                 continue
+
+            title = titles[i - 1] if i - 1 < len(titles) else ""
+            prompt, choices, is_prose = split_prompt_and_choices(parsed["question"])
+            answer_index = compute_answer_index(parsed["answer"])
+            if is_prose:
+                prose_count += 1
+            if answer_index is None:
+                unscored_count += 1
+
             all_cards.append(
                 {
                     "id": f"{chapter['number']}-{i}",
                     "chapter": chapter["number"],
                     "chapterTitle": chapter["title"],
+                    "questionNumber": parsed["questionNumber"] or i,
+                    "title": title,
                     "examRef": parsed["examRef"],
-                    "question": parsed["question"],
+                    "isProse": is_prose,
+                    "prompt": prompt,
+                    "choices": choices,
+                    "answerIndex": answer_index,
                     "answer": parsed["answer"],
                     "explanation": parsed["explanation"],
                 }
@@ -175,6 +332,8 @@ def main() -> None:
 
     write_cards_js(all_cards)
     print(f"OK: {len(all_cards)} 問を書き出しました -> {OUTPUT_PATH}")
+    print(f"  地の文表示(選択肢抽出不可)にフォールバックした問題数: {prose_count}")
+    print(f"  正解位置を判定できなかった問題数(採点対象外): {unscored_count}")
 
 
 if __name__ == "__main__":
