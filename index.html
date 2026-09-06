@@ -53,31 +53,19 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 12px 16px;
   }
   .toolbar button {
-    padding: 8px 12px;
+    padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid #d6d3d1;
     background: white;
+    font-size: 0.85rem;
+    white-space: nowrap;
   }
-  #progress-label { flex: 1; text-align: center; font-size: 0.9rem; }
+  #progress-label { flex: 1; text-align: center; font-size: 0.85rem; }
   #slider { width: calc(100% - 32px); margin: 0 16px 8px; }
-  .nav-buttons {
-    display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 0 16px 16px;
-  }
-  .nav-buttons button {
-    flex: 1;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #d6d3d1;
-    background: white;
-    font-size: 1rem;
-  }
   #card {
     margin: 0 16px 16px;
     border: 1px solid #d6d3d1;
@@ -227,7 +215,9 @@
 <div id="card-screen" hidden>
   <div class="toolbar">
     <button id="btn-back">← 章一覧</button>
+    <button id="btn-prev">前へ</button>
     <span id="progress-label"></span>
+    <button id="btn-next">次へ</button>
     <button id="btn-score">成績を見る</button>
   </div>
   <input type="range" id="slider" min="1" max="1" value="1">
@@ -257,10 +247,6 @@
       <div class="star-row" id="star-row"></div>
       <button id="btn-star-reset">実施回数リセット</button>
     </div>
-  </div>
-  <div class="nav-buttons">
-    <button id="btn-prev">前へ</button>
-    <button id="btn-next">次へ</button>
   </div>
 </div>
 <div class="overlay" id="score-overlay" hidden>
