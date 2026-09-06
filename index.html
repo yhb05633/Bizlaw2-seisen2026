@@ -110,6 +110,18 @@
   #answer-result { font-weight: bold; font-size: 1.1rem; margin: 0 0 10px; }
   #answer-result.correct { color: #16a34a; }
   #answer-result.incorrect { color: #dc2626; }
+  .master-btn {
+    display: block;
+    width: 100%;
+    margin: 0 0 12px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .master-btn.active { background: #7c3aed; border-color: #7c3aed; color: white; }
   .choice {
     padding: 12px 14px;
     border: 1px solid #d6d3d1;
@@ -197,6 +209,7 @@
     </div>
     <div class="card-face card-back">
       <div id="answer-result"></div>
+      <button id="btn-master" class="master-btn">マスター</button>
       <div id="answer-text"></div>
     </div>
     <div class="star-row-container">
@@ -291,6 +304,32 @@ function renderStarRow(id) {
     stars += i < count ? '★' : '☆';
   }
   row.textContent = stars;
+}
+
+const MASTER_KEY_PREFIX = 'bizlaw2seisen:master:';
+
+function isMastered(id) {
+  try {
+    return localStorage.getItem(MASTER_KEY_PREFIX + id) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function setMastered(id, value) {
+  try {
+    if (value) {
+      localStorage.setItem(MASTER_KEY_PREFIX + id, '1');
+    } else {
+      localStorage.removeItem(MASTER_KEY_PREFIX + id);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+function updateMasterButton(id) {
+  document.getElementById('btn-master').classList.toggle('active', isMastered(id));
 }
 
 function escapeHtml(str) {
@@ -479,6 +518,7 @@ function renderCard() {
     formatExplanation(stripLeadingAnswerLine(card.explanation, card.answer));
   document.getElementById('card').classList.toggle('flipped', isFlipped);
   renderStarRow(card.id);
+  updateMasterButton(card.id);
   updateResultBadge();
 }
 
@@ -514,6 +554,13 @@ document.getElementById('btn-answer').addEventListener('click', (e) => {
 document.getElementById('btn-star-reset').addEventListener('click', (e) => {
   e.stopPropagation();
   resetStarCount(currentCards[currentIndex].id);
+});
+
+document.getElementById('btn-master').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const id = currentCards[currentIndex].id;
+  setMastered(id, !isMastered(id));
+  updateMasterButton(id);
 });
 
 document.getElementById('btn-back').addEventListener('click', () => {
