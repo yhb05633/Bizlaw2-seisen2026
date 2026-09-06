@@ -62,22 +62,6 @@
     background: white;
     font-size: 1rem;
   }
-  .progress-buttons {
-    display: flex;
-    gap: 12px;
-    padding: 0 16px 24px;
-  }
-  .progress-buttons button {
-    flex: 1;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid #d6d3d1;
-    background: white;
-    font-size: 1rem;
-  }
-  .progress-buttons button.active { color: white; }
-  #btn-ok.active { background: #16a34a; border-color: #16a34a; }
-  #btn-ng.active { background: #dc2626; border-color: #dc2626; }
   #card {
     margin: 0 16px 16px;
     border: 1px solid #d6d3d1;
@@ -205,10 +189,6 @@
     <button id="btn-prev">前へ</button>
     <button id="btn-next">次へ</button>
   </div>
-  <div class="progress-buttons">
-    <button id="btn-ng">苦手</button>
-    <button id="btn-ok">できた</button>
-  </div>
 </div>
 <div class="overlay" id="score-overlay" hidden>
   <div class="overlay-content">
@@ -247,42 +227,12 @@ let isFlipped = false;
 let selectedChoiceIndex = null;
 let sessionResults = {};
 
-const PROGRESS_KEY_PREFIX = 'bizlaw2seisen:progress:';
 const STAR_KEY_PREFIX = 'bizlaw2seisen:stars:';
 const MAX_STARS = 10;
 const JUDGMENT_RE = /(最も)?(適切|正しい|誤り)(（[〇✕○×]）)?(である|でない|くない)?/;
 
 function getChapterMeta(chapterNumber) {
   return CHAPTERS.find((c) => c.number === chapterNumber);
-}
-
-function getProgress(id) {
-  try {
-    return localStorage.getItem(PROGRESS_KEY_PREFIX + id) || '';
-  } catch (e) {
-    return '';
-  }
-}
-
-function setProgress(id, status) {
-  const current = getProgress(id);
-  const next = current === status ? '' : status;
-  try {
-    if (next === '') {
-      localStorage.removeItem(PROGRESS_KEY_PREFIX + id);
-    } else {
-      localStorage.setItem(PROGRESS_KEY_PREFIX + id, next);
-    }
-  } catch (e) {
-    // localStorage unavailable (private mode, etc.) — ignore, state just won't persist
-  }
-  updateProgressButtons(id);
-}
-
-function updateProgressButtons(id) {
-  const status = getProgress(id);
-  document.getElementById('btn-ok').classList.toggle('active', status === 'ok');
-  document.getElementById('btn-ng').classList.toggle('active', status === 'ng');
 }
 
 function getStarCount(id) {
@@ -507,7 +457,6 @@ function renderCard() {
     `<p><strong>正解：${escapeHtml(card.answer)}</strong></p>` +
     formatExplanation(stripLeadingAnswerLine(card.explanation, card.answer));
   document.getElementById('card').classList.toggle('flipped', isFlipped);
-  updateProgressButtons(card.id);
   renderStarRow(card.id);
   updateResultBadge();
 }
@@ -560,12 +509,6 @@ document.getElementById('slider').addEventListener('input', (e) => {
   currentIndex = Number(e.target.value) - 1;
   isFlipped = false;
   renderCard();
-});
-document.getElementById('btn-ok').addEventListener('click', () => {
-  setProgress(currentCards[currentIndex].id, 'ok');
-});
-document.getElementById('btn-ng').addEventListener('click', () => {
-  setProgress(currentCards[currentIndex].id, 'ng');
 });
 
 function showScoreOverlay() {
