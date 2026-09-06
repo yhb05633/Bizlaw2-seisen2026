@@ -154,6 +154,9 @@ def _marker_value(circled, digit):
     return int(d)
 
 
+NOTE_LINE_RE = re.compile(r"^※")
+
+
 def split_prompt_and_choices(question_text: str):
     lines = question_text.split("\n")
     nonblank = [(i, l) for i, l in enumerate(lines) if l.strip() != ""]
@@ -164,37 +167,59 @@ def split_prompt_and_choices(question_text: str):
         if m:
             marker_positions.append((pos, _marker_value(m.group(1), m.group(2))))
 
+    # Find the earliest marker "1" that begins a clean 1,2,3,...,k run
+    # (k >= 3) among the marker-bearing lines, ignoring any non-marker
+    # lines in between (those become continuations of the preceding
+    # choice, e.g. a choice that wraps a follow-up line of dialogue).
     run = []
-    if marker_positions:
-        last_nonblank_pos = len(nonblank) - 1
-        if marker_positions[-1][0] == last_nonblank_pos:
-            run = [marker_positions[-1]]
-            for entry in reversed(marker_positions[:-1]):
-                prev_pos, prev_val = run[-1]
-                pos, val = entry
-                if pos == prev_pos - 1 and val == prev_val - 1:
-                    run.append(entry)
-                else:
-                    break
-            run.reverse()
-            if len(run) < 3 or run[0][1] != 1:
-                run = []
+    for k, (_, val) in enumerate(marker_positions):
+        if val != 1:
+            continue
+        seq = [marker_positions[k]]
+        expected = 2
+        j = k + 1
+        while j < len(marker_positions) and marker_positions[j][1] == expected:
+            seq.append(marker_positions[j])
+            expected += 1
+            j += 1
+        if len(seq) >= 3:
+            run = seq
+            break
 
-    if run:
-        start_nonblank_pos = run[0][0]
-        start_line_idx = nonblank[start_nonblank_pos][0]
-        prompt = "\n".join(lines[:start_line_idx]).strip()
-        choices = []
-        for pos, _ in run:
-            line_idx, line = nonblank[pos]
-            m = CHOICE_LINE_RE.match(line.strip())
-            text = normalize_choice_text(m.group(3).strip().replace("**", ""))
-            marker_val = _marker_value(m.group(1), m.group(2))
-            marker_char = CHOICE_MARKER_CHARS[marker_val - 1]
-            choices.append(f"{marker_char} {text}")
-        return prompt, choices, False
+    if not run:
+        return question_text, [], True, ""
 
-    return question_text, [], True
+    start_nonblank_pos = run[0][0]
+    start_line_idx = nonblank[start_nonblank_pos][0]
+    prompt = "\n".join(lines[:start_line_idx]).strip()
+
+    choices = []
+    note_lines = []
+    for idx, (pos, val) in enumerate(run):
+        marker_char = CHOICE_MARKER_CHARS[val - 1]
+        start_line = nonblank[pos][0]
+        scan_end = nonblank[run[idx + 1][0]][0] if idx + 1 < len(run) else len(lines)
+
+        m = CHOICE_LINE_RE.match(lines[start_line].strip())
+        parts = [m.group(3).strip()]
+
+        li = start_line + 1
+        while li < scan_end:
+            l = lines[li].strip()
+            if l == "":
+                li += 1
+                continue
+            if NOTE_LINE_RE.match(l):
+                note_lines = [ln.strip() for ln in lines[li:scan_end] if ln.strip() != ""]
+                break
+            parts.append(l)
+            li += 1
+
+        text = normalize_choice_text(" ".join(parts).replace("**", ""))
+        choices.append(f"{marker_char} {text}")
+
+    note = " ".join(note_lines)
+    return prompt, choices, False, note
 
 
 def compute_answer_index(answer: str):
@@ -358,7 +383,7 @@ def main() -> None:
                 continue
 
             title = titles[i - 1] if i - 1 < len(titles) else ""
-            prompt, choices, is_prose = split_prompt_and_choices(parsed["question"])
+            prompt, choices, is_prose, note = split_prompt_and_choices(parsed["question"])
             answer_index = compute_answer_index(parsed["answer"])
             if is_prose:
                 prose_count += 1
@@ -376,6 +401,7 @@ def main() -> None:
                     "isProse": is_prose,
                     "prompt": prompt,
                     "choices": choices,
+                    "note": note,
                     "answerIndex": answer_index,
                     "answer": parsed["answer"],
                     "explanation": parsed["explanation"],

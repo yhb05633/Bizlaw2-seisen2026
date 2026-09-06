@@ -99,6 +99,7 @@
   #card.flipped .card-front { display: none; }
   #card.flipped .card-back { display: block; }
   .exam-ref { font-size: 0.8rem; color: #78716c; margin-top: 16px; }
+  .choice-note { font-size: 0.8rem; color: #78716c; margin-top: 10px; }
   .tap-hint { font-size: 0.8rem; color: #a8a29e; margin-top: 16px; }
   #question-text p, #answer-text p { line-height: 1.6; margin: 0 0 10px; }
   #question-text ul, #answer-text ul { margin: 0 0 10px; padding-left: 1.4em; }
@@ -186,6 +187,7 @@
     <div class="card-face card-front">
       <div id="question-text"></div>
       <div id="choices-container"></div>
+      <div class="choice-note" id="choice-note" hidden></div>
       <div class="exam-ref" id="exam-ref"></div>
       <div class="tap-hint">タップして解答を見る</div>
     </div>
@@ -494,6 +496,9 @@ function renderCard() {
   renderHeader(card);
   document.getElementById('question-text').innerHTML = formatText(card.prompt, false);
   renderChoices(card);
+  const noteEl = document.getElementById('choice-note');
+  noteEl.textContent = card.note || '';
+  noteEl.hidden = !card.note;
   const examRefEl = document.getElementById('exam-ref');
   examRefEl.textContent = card.examRef;
   examRefEl.hidden = !card.examRef;

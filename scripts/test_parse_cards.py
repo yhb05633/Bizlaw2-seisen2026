@@ -267,7 +267,7 @@ class TestSplitPromptAndChoices(unittest.TestCase):
             "④ アオ\n"
             "⑤ イウ"
         )
-        prompt, choices, is_prose = split_prompt_and_choices(question)
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
         self.assertFalse(is_prose)
         self.assertEqual(len(choices), 5)
         self.assertEqual(choices[0], "① ア・イ")
@@ -277,38 +277,39 @@ class TestSplitPromptAndChoices(unittest.TestCase):
     def test_supports_six_choices(self):
         lines = "\n".join(f"{c} 選択肢{c}" for c in "①②③④⑤⑥")
         question = "設問文\n\n" + lines
-        prompt, choices, is_prose = split_prompt_and_choices(question)
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
         self.assertFalse(is_prose)
         self.assertEqual(len(choices), 6)
 
     def test_supports_arabic_markers(self):
         lines = "\n".join(f"{n}．選択肢{n}" for n in range(1, 6))
         question = "設問文\n\n" + lines
-        prompt, choices, is_prose = split_prompt_and_choices(question)
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
         self.assertFalse(is_prose)
         self.assertEqual(len(choices), 5)
         self.assertTrue(choices[0].startswith("①"))
 
     def test_falls_back_to_prose_when_u_tag_present(self):
         question = "本文①<u>下線部分</u>と②<u>別の下線部分</u>です。"
-        prompt, choices, is_prose = split_prompt_and_choices(question)
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
         self.assertTrue(is_prose)
         self.assertEqual(choices, [])
         self.assertEqual(prompt, question)
 
-    def test_falls_back_to_prose_when_trailing_note_after_choices(self):
+    def test_extracts_choices_and_trailing_note_separately(self):
         question = (
             "設問文\n\n"
-            "① アイ\n"
-            "② アウ\n"
-            "③ アエ\n\n"
+            "① ア・イ\n"
+            "② ア・ウ\n"
+            "③ ア・エ\n\n"
             "※注記があります。"
         )
-        prompt, choices, is_prose = split_prompt_and_choices(question)
-        self.assertTrue(is_prose)
-        self.assertEqual(choices, [])
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(choices, ["① ア・イ", "② ア・ウ", "③ ア・エ"])
+        self.assertEqual(note, "※注記があります。")
 
-    def test_falls_back_to_prose_when_choice_has_continuation_line(self):
+    def test_merges_continuation_line_into_the_preceding_choice(self):
         question = (
             "設問文\n\n"
             "① 甲「質問1」\n"
@@ -318,9 +319,17 @@ class TestSplitPromptAndChoices(unittest.TestCase):
             "③ 甲「質問3」\n"
             "   乙「回答3」"
         )
-        prompt, choices, is_prose = split_prompt_and_choices(question)
-        self.assertTrue(is_prose)
-        self.assertEqual(choices, [])
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
+        self.assertFalse(is_prose)
+        self.assertEqual(
+            choices,
+            [
+                "① 甲「質問1」 乙「回答1」",
+                "② 甲「質問2」 乙「回答2」",
+                "③ 甲「質問3」 乙「回答3」",
+            ],
+        )
+        self.assertEqual(note, "")
 
     def test_extracts_combination_choices_even_with_inline_underline_paragraph(self):
         question = (
@@ -332,7 +341,7 @@ class TestSplitPromptAndChoices(unittest.TestCase):
             "④（b）（c）（d）\n"
             "⑤（c）（d）（e）"
         )
-        prompt, choices, is_prose = split_prompt_and_choices(question)
+        prompt, choices, is_prose, note = split_prompt_and_choices(question)
         self.assertFalse(is_prose)
         self.assertEqual(len(choices), 5)
         self.assertIn("<u>下線部分A</u>", prompt)
