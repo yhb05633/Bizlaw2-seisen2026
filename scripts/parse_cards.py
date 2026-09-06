@@ -215,7 +215,7 @@ def split_prompt_and_choices(question_text: str):
             parts.append(l)
             li += 1
 
-        text = normalize_choice_text(" ".join(parts).replace("**", ""))
+        text = normalize_choice_text("\n".join(parts).replace("**", ""))
         choices.append(f"{marker_char} {text}")
 
     note = " ".join(note_lines)

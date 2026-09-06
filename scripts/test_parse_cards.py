@@ -324,9 +324,9 @@ class TestSplitPromptAndChoices(unittest.TestCase):
         self.assertEqual(
             choices,
             [
-                "① 甲「質問1」 乙「回答1」",
-                "② 甲「質問2」 乙「回答2」",
-                "③ 甲「質問3」 乙「回答3」",
+                "① 甲「質問1」\n乙「回答1」",
+                "② 甲「質問2」\n乙「回答2」",
+                "③ 甲「質問3」\n乙「回答3」",
             ],
         )
         self.assertEqual(note, "")
