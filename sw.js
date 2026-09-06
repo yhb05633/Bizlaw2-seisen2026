@@ -1,4 +1,4 @@
-const CACHE_NAME = "bizlaw2-seisen2026-v1";
+const CACHE_NAME = "bizlaw2-seisen2026-v2";
 const ASSETS = [
   "./",
   "./index.html",

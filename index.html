@@ -209,7 +209,7 @@
     resize: vertical;
     box-sizing: border-box;
   }
-  .memo-item { margin-bottom: 12px; list-style: none; }
+  .memo-item { margin-bottom: 12px; list-style: none; cursor: pointer; }
   .memo-item:last-child { margin-bottom: 0; }
   .memo-item-title { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; cursor: pointer; }
   .memo-item-text { font-size: 0.85rem; color: #44403c; white-space: pre-line; cursor: pointer; }
@@ -522,21 +522,31 @@ function stripLeadingAnswerLine(text, answer) {
   return lines.join('\n');
 }
 
+function showChapterScreen() {
+  document.getElementById('card-screen').hidden = true;
+  document.getElementById('chapter-screen').hidden = false;
+  renderChapterList();
+}
+
+function showCardScreen() {
+  document.getElementById('chapter-screen').hidden = true;
+  document.getElementById('card-screen').hidden = false;
+}
+
 function startChapter(target) {
   let cards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
   if (isMasterSkipEnabled()) {
     cards = cards.filter((c) => !isMastered(c.id));
   }
   if (cards.length === 0) {
-    alert('この章はすべてマスター済みです');
+    alert(target === 'all' ? 'すべての問題がマスター済みです' : 'この章はすべてマスター済みです');
     return;
   }
   currentCards = cards;
   currentIndex = 0;
   isFlipped = false;
   sessionResults = {};
-  document.getElementById('chapter-screen').hidden = true;
-  document.getElementById('card-screen').hidden = false;
+  showCardScreen();
   renderCard();
 }
 
@@ -690,7 +700,7 @@ document.getElementById('btn-master').addEventListener('click', (e) => {
   updateMasterButton(id);
 });
 
-document.getElementById('memo-input').addEventListener('click', (e) => {
+document.querySelector('.memo-container').addEventListener('click', (e) => {
   e.stopPropagation();
 });
 document.getElementById('memo-input').addEventListener('input', (e) => {
@@ -698,8 +708,7 @@ document.getElementById('memo-input').addEventListener('input', (e) => {
 });
 
 document.getElementById('btn-back').addEventListener('click', () => {
-  document.getElementById('card-screen').hidden = true;
-  document.getElementById('chapter-screen').hidden = false;
+  showChapterScreen();
 });
 
 function goNext() {
@@ -781,8 +790,7 @@ document.getElementById('memo-list').addEventListener('click', (e) => {
   const card = CARDS.find((c) => c.id === cardId);
   if (!card) return;
   document.getElementById('memo-overlay').hidden = true;
-  document.getElementById('chapter-screen').hidden = true;
-  document.getElementById('card-screen').hidden = false;
+  showCardScreen();
   currentCards = CARDS.filter((c) => c.chapter === card.chapter);
   currentIndex = currentCards.findIndex((c) => c.id === cardId);
   sessionResults = {};
