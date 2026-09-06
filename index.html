@@ -85,6 +85,24 @@
   .exam-ref { font-size: 0.8rem; color: #78716c; margin-top: 16px; }
   .choice-note { font-size: 0.8rem; color: #78716c; margin-top: 10px; }
   .tap-hint { font-size: 0.8rem; color: #a8a29e; margin-top: 16px; }
+  .answer-btn {
+    display: block;
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #1c1917;
+    background: #1c1917;
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  .answer-btn:disabled {
+    background: #e7e5e4;
+    border-color: #d6d3d1;
+    color: #a8a29e;
+    cursor: not-allowed;
+  }
   #question-text p, #answer-text p { line-height: 1.6; margin: 0 0 10px; }
   #question-text ul, #answer-text ul { margin: 0 0 10px; padding-left: 1.4em; }
   #answer-text li { margin-bottom: 1em; }
@@ -175,6 +193,7 @@
       <div class="choice-note" id="choice-note" hidden></div>
       <div class="exam-ref" id="exam-ref"></div>
       <div class="tap-hint">タップして解答を見る</div>
+      <button id="btn-answer" class="answer-btn">解答を見る</button>
     </div>
     <div class="card-face card-back">
       <div id="answer-result"></div>
@@ -405,6 +424,7 @@ function selectChoice(idx) {
     incrementStarCount(card.id);
   }
   updateResultBadge();
+  updateAnswerButtonState();
 }
 
 function updateResultBadge() {
@@ -447,6 +467,7 @@ function renderCard() {
   renderHeader(card);
   document.getElementById('question-text').innerHTML = formatText(card.prompt, false);
   renderChoices(card);
+  updateAnswerButtonState();
   const noteEl = document.getElementById('choice-note');
   noteEl.textContent = card.note || '';
   noteEl.hidden = !card.note;
@@ -461,7 +482,7 @@ function renderCard() {
   updateResultBadge();
 }
 
-document.getElementById('card').addEventListener('click', () => {
+function flipToggle() {
   const card = currentCards[currentIndex];
   isFlipped = !isFlipped;
   if (isFlipped) {
@@ -469,6 +490,25 @@ document.getElementById('card').addEventListener('click', () => {
     updateResultBadge();
   }
   document.getElementById('card').classList.toggle('flipped', isFlipped);
+}
+
+function flipToAnswer() {
+  if (isFlipped) return;
+  flipToggle();
+}
+
+function updateAnswerButtonState() {
+  const hasSelectable = document.querySelectorAll('.choice, #question-text u.choice-span').length > 0;
+  document.getElementById('btn-answer').disabled = hasSelectable && selectedChoiceIndex === null;
+}
+
+document.getElementById('card').addEventListener('click', () => {
+  flipToggle();
+});
+
+document.getElementById('btn-answer').addEventListener('click', (e) => {
+  e.stopPropagation();
+  flipToAnswer();
 });
 
 document.getElementById('btn-star-reset').addEventListener('click', (e) => {
