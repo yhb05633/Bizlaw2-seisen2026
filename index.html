@@ -196,6 +196,23 @@
     border: 1px solid #d6d3d1;
     background: white;
   }
+  .memo-container { margin-top: 16px; }
+  .memo-label { display: block; font-size: 0.8rem; color: #78716c; margin-bottom: 4px; }
+  .memo-input {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    font-size: 16px;
+    font-family: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+  .memo-item { margin-bottom: 12px; list-style: none; }
+  .memo-item:last-child { margin-bottom: 0; }
+  .memo-item-title { font-weight: bold; font-size: 0.85rem; margin-bottom: 4px; cursor: pointer; }
+  .memo-item-text { font-size: 0.85rem; color: #44403c; white-space: pre-line; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -203,6 +220,7 @@
   <h1>ビジ法2級 精選フラッシュカード</h1>
   <div class="chapter-toolbar">
     <button id="btn-master-skip"></button>
+    <button id="btn-memo-list">メモ一覧</button>
   </div>
   <div id="chapter-list"></div>
 </div>
@@ -230,6 +248,10 @@
       <div id="answer-result"></div>
       <button id="btn-master" class="master-btn">マスター</button>
       <div id="answer-text"></div>
+      <div class="memo-container">
+        <label for="memo-input" class="memo-label">メモ</label>
+        <textarea id="memo-input" class="memo-input" placeholder="この問題のポイントをメモ..."></textarea>
+      </div>
     </div>
     <div class="star-row-container">
       <div class="star-row" id="star-row"></div>
@@ -248,6 +270,13 @@
     <ul id="score-list"></ul>
     <button id="btn-score-reset">成績をリセット</button>
     <button id="btn-score-close">閉じる</button>
+  </div>
+</div>
+<div class="overlay" id="memo-overlay" hidden>
+  <div class="overlay-content">
+    <h2>メモ一覧</h2>
+    <ul id="memo-list"></ul>
+    <button id="btn-memo-close">閉じる</button>
   </div>
 </div>
 
@@ -397,6 +426,28 @@ function setMastered(id, value) {
 
 function updateMasterButton(id) {
   document.getElementById('btn-master').classList.toggle('active', isMastered(id));
+}
+
+const MEMO_KEY_PREFIX = 'bizlaw2seisen:memo:';
+
+function getMemo(id) {
+  try {
+    return localStorage.getItem(MEMO_KEY_PREFIX + id) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function setMemo(id, text) {
+  try {
+    if (text.trim() === '') {
+      localStorage.removeItem(MEMO_KEY_PREFIX + id);
+    } else {
+      localStorage.setItem(MEMO_KEY_PREFIX + id, text);
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 function escapeHtml(str) {
@@ -594,6 +645,7 @@ function renderCard() {
   document.getElementById('card').classList.toggle('flipped', isFlipped);
   renderStarRow(card.id);
   updateMasterButton(card.id);
+  document.getElementById('memo-input').value = getMemo(card.id);
   updateResultBadge();
 }
 
@@ -636,6 +688,13 @@ document.getElementById('btn-master').addEventListener('click', (e) => {
   const id = currentCards[currentIndex].id;
   setMastered(id, !isMastered(id));
   updateMasterButton(id);
+});
+
+document.getElementById('memo-input').addEventListener('click', (e) => {
+  e.stopPropagation();
+});
+document.getElementById('memo-input').addEventListener('input', (e) => {
+  setMemo(currentCards[currentIndex].id, e.target.value);
 });
 
 document.getElementById('btn-back').addEventListener('click', () => {
@@ -698,6 +757,37 @@ document.getElementById('btn-score-close').addEventListener('click', () => {
 document.getElementById('btn-score-reset').addEventListener('click', () => {
   sessionResults = {};
   showScoreOverlay();
+});
+
+function showMemoOverlay() {
+  const withMemo = CARDS.filter((c) => getMemo(c.id).trim() !== '');
+  const list = withMemo
+    .map((c) => `<li class="memo-item" data-card-id="${c.id}"><div class="memo-item-title">第${c.chapter}章 第${c.questionNumber}問（${escapeHtml(c.title)}）</div><div class="memo-item-text">${escapeHtml(getMemo(c.id))}</div></li>`)
+    .join('');
+  document.getElementById('memo-list').innerHTML = list || '<li>メモはまだありません</li>';
+  document.getElementById('memo-overlay').hidden = false;
+}
+
+document.getElementById('btn-memo-list').addEventListener('click', () => {
+  showMemoOverlay();
+});
+document.getElementById('btn-memo-close').addEventListener('click', () => {
+  document.getElementById('memo-overlay').hidden = true;
+});
+document.getElementById('memo-list').addEventListener('click', (e) => {
+  const item = e.target.closest('.memo-item');
+  if (!item) return;
+  const cardId = item.dataset.cardId;
+  const card = CARDS.find((c) => c.id === cardId);
+  if (!card) return;
+  document.getElementById('memo-overlay').hidden = true;
+  document.getElementById('chapter-screen').hidden = true;
+  document.getElementById('card-screen').hidden = false;
+  currentCards = CARDS.filter((c) => c.chapter === card.chapter);
+  currentIndex = currentCards.findIndex((c) => c.id === cardId);
+  sessionResults = {};
+  isFlipped = true;
+  renderCard();
 });
 
 renderChapterList();
