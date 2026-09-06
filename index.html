@@ -33,6 +33,22 @@
     cursor: pointer;
   }
   .chapter-item:active { background: #e7e5e4; }
+  .chapter-item-title { display: block; }
+  .chapter-item-master { display: block; font-size: 0.75rem; color: #78716c; margin-top: 2px; }
+  .chapter-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 12px;
+  }
+  .chapter-toolbar button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+    font-size: 0.9rem;
+  }
+  #btn-master-skip.active { background: #7c3aed; border-color: #7c3aed; color: white; }
   .toolbar {
     display: flex;
     justify-content: space-between;
@@ -185,6 +201,9 @@
 <body>
 <div id="chapter-screen">
   <h1>ビジ法2級 精選フラッシュカード</h1>
+  <div class="chapter-toolbar">
+    <button id="btn-master-skip"></button>
+  </div>
   <div id="chapter-list"></div>
 </div>
 <div id="card-screen" hidden>
@@ -234,24 +253,72 @@
 
 <script src="cards.js"></script>
 <script>
+function masteryStats(cardsArray) {
+  const total = cardsArray.length;
+  const mastered = cardsArray.filter((c) => isMastered(c.id)).length;
+  const pct = total === 0 ? 0 : Math.round((mastered / total) * 100);
+  return { mastered, total, pct };
+}
+
 function renderChapterList() {
   const container = document.getElementById('chapter-list');
   container.innerHTML = '';
 
+  const allStats = masteryStats(CARDS);
   const allBtn = document.createElement('button');
   allBtn.className = 'chapter-item';
-  allBtn.textContent = `すべて［${CARDS.length}問］`;
+  allBtn.innerHTML =
+    `<span class="chapter-item-title">すべて［${CARDS.length}問］</span>` +
+    `<span class="chapter-item-master">マスター ${allStats.mastered}/${allStats.total}（${allStats.pct}%）</span>`;
   allBtn.addEventListener('click', () => startChapter('all'));
   container.appendChild(allBtn);
 
   for (const ch of CHAPTERS) {
+    const chapterCards = CARDS.filter((c) => c.chapter === ch.number);
+    const stats = masteryStats(chapterCards);
     const btn = document.createElement('button');
     btn.className = 'chapter-item';
-    btn.textContent = `第${ch.number}章 ${ch.title}［${ch.count}問］`;
+    btn.innerHTML =
+      `<span class="chapter-item-title">第${ch.number}章 ${ch.title}［${ch.count}問］</span>` +
+      `<span class="chapter-item-master">マスター ${stats.mastered}/${stats.total}（${stats.pct}%）</span>`;
     btn.addEventListener('click', () => startChapter(ch.number));
     container.appendChild(btn);
   }
 }
+
+const MASTER_SKIP_KEY = 'bizlaw2seisen:masterSkipEnabled';
+
+function isMasterSkipEnabled() {
+  try {
+    return localStorage.getItem(MASTER_SKIP_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function setMasterSkipEnabled(value) {
+  try {
+    if (value) {
+      localStorage.setItem(MASTER_SKIP_KEY, '1');
+    } else {
+      localStorage.removeItem(MASTER_SKIP_KEY);
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+function updateMasterSkipButton() {
+  const enabled = isMasterSkipEnabled();
+  const btn = document.getElementById('btn-master-skip');
+  btn.textContent = enabled ? 'マスタースキップ: ON' : 'マスタースキップ: OFF';
+  btn.classList.toggle('active', enabled);
+}
+
+document.getElementById('btn-master-skip').addEventListener('click', () => {
+  setMasterSkipEnabled(!isMasterSkipEnabled());
+  updateMasterSkipButton();
+});
 
 let currentCards = [];
 let currentIndex = 0;
@@ -405,7 +472,15 @@ function stripLeadingAnswerLine(text, answer) {
 }
 
 function startChapter(target) {
-  currentCards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
+  let cards = target === 'all' ? CARDS : CARDS.filter((c) => c.chapter === target);
+  if (isMasterSkipEnabled()) {
+    cards = cards.filter((c) => !isMastered(c.id));
+  }
+  if (cards.length === 0) {
+    alert('この章はすべてマスター済みです');
+    return;
+  }
+  currentCards = cards;
   currentIndex = 0;
   isFlipped = false;
   sessionResults = {};
@@ -626,6 +701,7 @@ document.getElementById('btn-score-reset').addEventListener('click', () => {
 });
 
 renderChapterList();
+updateMasterSkipButton();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
