@@ -185,6 +185,17 @@
     background: white;
   }
   .memo-container { margin-top: 16px; }
+  .memo-list-card-btn {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #d6d3d1;
+    background: white;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
   .memo-label { display: block; font-size: 0.8rem; color: #78716c; margin-bottom: 4px; }
   .memo-input {
     width: 100%;
@@ -242,6 +253,7 @@
         <label for="memo-input" class="memo-label">メモ</label>
         <textarea id="memo-input" class="memo-input" placeholder="この問題のポイントをメモ..."></textarea>
       </div>
+      <button id="btn-memo-list-card" class="memo-list-card-btn">メモ一覧</button>
     </div>
     <div class="star-row-container">
       <div class="star-row" id="star-row"></div>
@@ -666,7 +678,48 @@ function updateAnswerButtonState() {
 }
 
 document.getElementById('card').addEventListener('click', () => {
+  if (didSwipe) {
+    didSwipe = false;
+    return;
+  }
   flipToggle();
+});
+
+const SWIPE_THRESHOLD = 50;
+let touchStartX = null;
+let touchStartY = null;
+let didSwipe = false;
+
+document.getElementById('card').addEventListener('touchstart', (e) => {
+  if (e.touches.length !== 1) return;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.getElementById('card').addEventListener('touchmove', (e) => {
+  if (touchStartX === null || e.touches.length !== 1) return;
+  const deltaX = e.touches[0].clientX - touchStartX;
+  const deltaY = e.touches[0].clientY - touchStartY;
+  if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+document.getElementById('card').addEventListener('touchend', (e) => {
+  if (touchStartX === null) return;
+  const touch = e.changedTouches[0];
+  const deltaX = touch.clientX - touchStartX;
+  const deltaY = touch.clientY - touchStartY;
+  touchStartX = null;
+  touchStartY = null;
+  if (Math.abs(deltaX) >= SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY)) {
+    didSwipe = true;
+    if (deltaX < 0) {
+      goNext();
+    } else {
+      goPrev();
+    }
+  }
 });
 
 document.getElementById('btn-answer').addEventListener('click', (e) => {
@@ -764,6 +817,10 @@ function showMemoOverlay() {
 }
 
 document.getElementById('btn-memo-list').addEventListener('click', () => {
+  showMemoOverlay();
+});
+document.getElementById('btn-memo-list-card').addEventListener('click', (e) => {
+  e.stopPropagation();
   showMemoOverlay();
 });
 document.getElementById('btn-memo-close').addEventListener('click', () => {
