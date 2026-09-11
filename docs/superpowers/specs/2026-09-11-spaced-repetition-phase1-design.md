@@ -48,8 +48,10 @@ value (JSON):
 ## 間隔反復ロジック
 
 ```
-BOX_INTERVAL_DAYS = {1:1, 2:3, 3:7, 4:14, 5:30}
+BOX_INTERVAL_DAYS = {1:0, 2:3, 3:7, 4:14, 5:30}
 ```
+
+Box1は当日（0日・即日）再出題。Box2以降は翌日以降の間隔(3/7/14/30日)。
 
 - `todayStr()`: ローカルタイムゾーンの `YYYY-MM-DD` を返す。
 - `addDays(dateStr, n)`: 日付文字列にn日加算した `YYYY-MM-DD` を返す。

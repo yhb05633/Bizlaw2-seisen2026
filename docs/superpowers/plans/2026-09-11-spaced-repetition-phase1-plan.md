@@ -136,7 +136,7 @@ function setMemo(id, text) {
 }
 
 const SRS_KEY_PREFIX = 'bizlaw2seisen:srs:';
-const BOX_INTERVAL_DAYS = { 1: 1, 2: 3, 3: 7, 4: 14, 5: 30 };
+const BOX_INTERVAL_DAYS = { 1: 0, 2: 3, 3: 7, 4: 14, 5: 30 };
 
 function todayStr() {
   const d = new Date();
@@ -333,6 +333,7 @@ script = '''
 window.addEventListener('load', () => {
   const results = [];
   const check = (name, cond) => results.push(name + ':' + (cond ? 'PASS' : 'FAIL'));
+  window.alert = () => {}; // real alert() blocks --dump-dom forever waiting for a dialog dismissal that never comes
 
   check('btn exists', !!document.getElementById('btn-review-queue'));
   check('initial label 172', document.getElementById('btn-review-queue').textContent === '\\u4eca\\u65e5\\u306e\\u5fa9\\u7fd2\\uff08172\\uff09');
@@ -366,7 +367,7 @@ PYEOF
 rm -rf "$SCRATCH"
 ```
 
-Expected: the title contains only `:PASS` entries (7 checks), no `:FAIL`. (The `\u...` escapes in the injected script are the literal Japanese label text `今日の復習（172）` / `今日の復習（171）` — written as escapes here only so this plan document stays ASCII-safe when quoted through the heredoc; the actual injected `<script>` can use the literal Japanese characters directly instead of escapes.)
+Expected: the title contains only `:PASS` entries (8 checks), no `:FAIL`. (The `\u...` escapes in the injected script are the literal Japanese label text `今日の復習（172）` / `今日の復習（171）` — written as escapes here only so this plan document stays ASCII-safe when quoted through the heredoc; the actual injected `<script>` can use the literal Japanese characters directly instead of escapes.)
 
 - [ ] **Step 9: Commit**
 
@@ -482,7 +483,7 @@ function applySelfAssessment(id, grade) {
   }
   srs.box = newBox;
   srs.lastReviewedAt = new Date().toISOString();
-  srs.nextReviewAt = addDays(todayStr(), BOX_INTERVAL_DAYS[newBox]);
+  srs.nextReviewAt = addDays(todayStr(), BOX_INTERVAL_DAYS[newBox] ?? 1);
   srs.totalReviews += 1;
   srs.streak = grade === 'unknown' ? 0 : srs.streak + 1;
   if (grade !== 'unknown') srs.totalCorrect += 1;
@@ -594,7 +595,7 @@ window.addEventListener('load', () => {
   unknownBtn.click();
   srs = getSrs('1-1');
   check('unknown resets box to 1', srs.box === 1);
-  check('unknown sets nextReviewAt +1d', srs.nextReviewAt === addDays(todayStr(), 1));
+  check('unknown sets nextReviewAt today', srs.nextReviewAt === todayStr());
   check('unknown totalReviews 2', srs.totalReviews === 2);
   check('unknown totalCorrect unchanged', srs.totalCorrect === 1);
   check('unknown resets streak', srs.streak === 0);
@@ -608,8 +609,8 @@ window.addEventListener('load', () => {
   check('barely streak 1', srs.streak === 1);
   check('still flipped after barely', document.getElementById('card').classList.contains('flipped') === true);
 
-  check('1-1 not due after grading', isDueToday('1-1') === false);
-  check('due cards exclude 1-1', getDueCards(CARDS).some((c) => c.id === '1-1') === false);
+  check('1-1 due today after grading', isDueToday('1-1') === true);
+  check('due cards include 1-1', getDueCards(CARDS).some((c) => c.id === '1-1') === true);
 
   localStorage.removeItem('bizlaw2seisen:srs:1-1');
 
@@ -624,7 +625,7 @@ PYEOF
 rm -rf "$SCRATCH"
 ```
 
-Expected: the title contains only `:PASS` entries (16 checks), no `:FAIL`. (The `\u...` escape is the literal Japanese label prefix `次回復習: ` — written as an escape here only so this plan document stays ASCII-safe; the actual injected `<script>` can use the literal characters directly.)
+Expected: the title contains only `:PASS` entries (20 checks), no `:FAIL`. (The `\u...` escape is the literal Japanese label prefix `次回復習: ` — written as an escape here only so this plan document stays ASCII-safe; the actual injected `<script>` can use the literal characters directly.)
 
 - [ ] **Step 7: Commit**
 
