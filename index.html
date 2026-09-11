@@ -37,11 +37,13 @@
   .chapter-item-master { display: block; font-size: 0.75rem; color: #78716c; margin-top: 2px; }
   .chapter-toolbar {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 0 16px 12px;
   }
   .chapter-toolbar button {
     flex: 1;
+    min-width: 140px;
     padding: 10px;
     border-radius: 8px;
     border: 1px solid #d6d3d1;
@@ -219,6 +221,7 @@
   <h1>ビジ法2級 精選フラッシュカード</h1>
   <div class="chapter-toolbar">
     <button id="btn-master-skip"></button>
+    <button id="btn-review-queue"></button>
     <button id="btn-memo-list">メモ一覧</button>
   </div>
   <div id="chapter-list"></div>
@@ -347,6 +350,10 @@ document.getElementById('btn-master-skip').addEventListener('click', () => {
   updateMasterSkipButton();
 });
 
+document.getElementById('btn-review-queue').addEventListener('click', () => {
+  startReviewQueue();
+});
+
 let currentCards = [];
 let currentIndex = 0;
 let isFlipped = false;
@@ -448,6 +455,53 @@ function setMemo(id, text) {
   }
 }
 
+const SRS_KEY_PREFIX = 'bizlaw2seisen:srs:';
+const BOX_INTERVAL_DAYS = { 1: 1, 2: 3, 3: 7, 4: 14, 5: 30 };
+
+function todayStr() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDays(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  const yy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function getSrs(id) {
+  try {
+    const raw = localStorage.getItem(SRS_KEY_PREFIX + id);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    // ignore
+  }
+  return { box: 1, lastReviewedAt: null, nextReviewAt: todayStr(), streak: 0, totalReviews: 0, totalCorrect: 0 };
+}
+
+function saveSrs(id, srs) {
+  try {
+    localStorage.setItem(SRS_KEY_PREFIX + id, JSON.stringify(srs));
+  } catch (e) {
+    // ignore
+  }
+}
+
+function isDueToday(id) {
+  return getSrs(id).nextReviewAt <= todayStr();
+}
+
+function getDueCards(cardsArray) {
+  return cardsArray.filter((c) => isDueToday(c.id));
+}
+
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -524,6 +578,12 @@ function showChapterScreen() {
   document.getElementById('card-screen').hidden = true;
   document.getElementById('chapter-screen').hidden = false;
   renderChapterList();
+  updateReviewQueueButton();
+}
+
+function updateReviewQueueButton() {
+  const count = getDueCards(CARDS).length;
+  document.getElementById('btn-review-queue').textContent = `今日の復習（${count}）`;
 }
 
 function showCardScreen() {
@@ -538,6 +598,20 @@ function startChapter(target) {
   }
   if (cards.length === 0) {
     alert(target === 'all' ? 'すべての問題がマスター済みです' : 'この章はすべてマスター済みです');
+    return;
+  }
+  currentCards = cards;
+  currentIndex = 0;
+  isFlipped = false;
+  sessionResults = {};
+  showCardScreen();
+  renderCard();
+}
+
+function startReviewQueue() {
+  const cards = getDueCards(CARDS);
+  if (cards.length === 0) {
+    alert('今日復習すべきカードはありません');
     return;
   }
   currentCards = cards;
@@ -843,6 +917,7 @@ document.getElementById('memo-list').addEventListener('click', (e) => {
 
 renderChapterList();
 updateMasterSkipButton();
+updateReviewQueueButton();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
