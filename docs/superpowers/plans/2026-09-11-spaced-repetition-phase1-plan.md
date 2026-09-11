@@ -333,6 +333,7 @@ script = '''
 window.addEventListener('load', () => {
   const results = [];
   const check = (name, cond) => results.push(name + ':' + (cond ? 'PASS' : 'FAIL'));
+  window.alert = () => {}; // real alert() blocks --dump-dom forever waiting for a dialog dismissal that never comes
 
   check('btn exists', !!document.getElementById('btn-review-queue'));
   check('initial label 172', document.getElementById('btn-review-queue').textContent === '\\u4eca\\u65e5\\u306e\\u5fa9\\u7fd2\\uff08172\\uff09');
