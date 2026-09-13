@@ -144,6 +144,7 @@
     font-size: 0.85rem;
     cursor: pointer;
   }
+  .assess-btn.selected { background: #1c1917; color: white; border-color: #1c1917; }
   .next-review-label {
     font-size: 0.75rem;
     color: #78716c;
@@ -272,14 +273,14 @@
     </div>
     <div class="card-face card-back">
       <div id="answer-result"></div>
+      <button id="btn-master" class="master-btn">マスター</button>
+      <div id="answer-text"></div>
       <div class="self-assessment">
         <button class="assess-btn" data-grade="unknown">わからなかった</button>
         <button class="assess-btn" data-grade="barely">かろうじて正解</button>
         <button class="assess-btn" data-grade="easy">簡単だった</button>
       </div>
       <div id="next-review-label" class="next-review-label"></div>
-      <button id="btn-master" class="master-btn">マスター</button>
-      <div id="answer-text"></div>
       <div class="memo-container">
         <label for="memo-input" class="memo-label">メモ</label>
         <textarea id="memo-input" class="memo-input" placeholder="この問題のポイントをメモ..."></textarea>
@@ -790,6 +791,7 @@ function renderCard() {
   renderStarRow(card.id);
   updateMasterButton(card.id);
   renderSrsLabel(card.id);
+  document.querySelectorAll('.assess-btn').forEach((el) => el.classList.remove('selected'));
   document.getElementById('memo-input').value = getMemo(card.id);
   updateResultBadge();
 }
@@ -883,6 +885,9 @@ document.querySelector('.self-assessment').addEventListener('click', (e) => {
   const id = currentCards[currentIndex].id;
   applySelfAssessment(id, btn.dataset.grade);
   renderSrsLabel(id);
+  document.querySelectorAll('.assess-btn').forEach((el) => {
+    el.classList.toggle('selected', el === btn);
+  });
 });
 
 document.querySelector('.memo-container').addEventListener('click', (e) => {
